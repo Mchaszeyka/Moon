@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moon — Configure Your Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f7f6f2;
+      --surface: #ffffff;
+      --border: #e8e6e0;
+      --border-strong: #d0cdc4;
+      --ink: #1c1c1a;
+      --muted: #8a8880;
+      --accent: #1c1c1a;
+      --success: #16a34a;
+      --warn: #ca8a04;
+      --danger: #dc2626;
+      --radius: 10px;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-mark {
+      width: 28px;
+      height: 28px;
+      background: var(--ink);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .logo-name {
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      color: var(--ink);
+    }
+    .logo-tag {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      padding: 7px 16px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--bg); color: var(--ink); }
+    .btn-primary {
+      background: var(--ink);
+      color: #fff;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-success {
+      background: #dcfce7;
+      color: var(--success);
+      border: 1px solid #bbf7d0;
+    }
+
+    /* ── Progress steps ── */
+    .steps-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      height: 44px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 20px 0 0;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .step-item:first-child { padding-left: 0; }
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .step-num.done { background: var(--ink); color: #fff; }
+    .step-num.active { background: var(--ink); color: #fff; }
+    .step-num.idle { background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+    .step-label {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      transition: color 0.15s;
+    }
+    .step-item.active .step-label { color: var(--ink); }
+    .step-item.done .step-label { color: var(--muted); }
+    .step-divider {
+      flex-shrink: 0;
+      width: 24px;
+      height: 1px;
+      background: var(--border);
+      margin-right: 20px;
+    }
+
+    /* ── Main layout ── */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      overflow: hidden;
+    }
+
+    /* ── Form panel ── */
+    .form-panel {
+      overflow-y: auto;
+      padding: 40px 48px;
+    }
+    .form-panel::-webkit-scrollbar { width: 3px; }
+    .form-panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .step-content { display: none; }
+    .step-content.active { display: block; }
+
+    .step-heading {
+      font-family: 'Instrument Serif', serif;
+      font-size: 32px;
+      color: var(--ink);
+      margin-bottom: 6px;
+      line-height: 1.2;
+      font-weight: normal;
+    }
+    .step-heading em { font-style: italic; color: var(--muted); }
+    .step-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 40px;
+      line-height: 1.7;
+      max-width: 480px;
+    }
+
+    .field { margin-bottom: 28px; }
+    .field-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .field-hint { font-size: 9px; color: var(--muted); opacity: 0.7; }
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      color: var(--ink);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      resize: none;
+    }
+    .field input:focus,
+    .field textarea:focus {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 3px rgba(28,28,26,0.06);
+    }
+    .field input::placeholder,
+    .field textarea::placeholder { color: #ccc; }
+
+    .color-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .color-input {
+      width: 42px !important;
+      height: 42px;
+      padding: 3px !important;
+      cursor: pointer;
+      border-radius: 8px !important;
+    }
+    .color-hex {
+      flex: 1;
+      font-size: 11px !important;
+    }
+    .color-swatches {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, transform 0.15s;
+      flex-shrink: 0;
+    }
+    .swatch:hover { transform: scale(1.1); }
+    .swatch.selected { border-color: var(--ink); }
+
+    /* Tag input */
+    .tag-input-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px;
+      background: var(--surface);
+      min-height: 44px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: flex-start;
+      transition: border-color 0.15s;
+      cursor: text;
+    }
+    .tag-input-wrap:focus-within {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 3px rgba(28,28,26,0.06);
+    }
+    .tag {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 10px;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    .tag.bad { background: #fef2f2; border-color: #fecaca; color: var(--danger); }
+    .tag-remove {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .tag-remove:hover { color: var(--ink); }
+    .tag-ghost-input {
+      border: none;
+      outline: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--ink);
+      background: transparent;
+      min-width: 120px;
+      flex: 1;
+      padding: 3px 4px;
+    }
+    .tag-ghost-input::placeholder { color: #ccc; }
+
+    .field-note {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    /* Step nav */
+    .step-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 48px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    .step-progress {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Preview panel ── */
+    .preview-panel {
+      border-left: 1px solid var(--border);
+      background: #f0ede6;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .preview-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border-strong);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      background: rgba(255,255,255,0.5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .preview-live {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .live-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px #4ade80;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .preview-site {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .mock-site {
+      padding: 24px;
+      height: 100%;
+    }
+    .mock-nav {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .mock-logo-pill {
+      width: 60px;
+      height: 8px;
+      background: var(--border-strong);
+      border-radius: 4px;
+    }
+    .mock-nav-links {
+      display: flex;
+      gap: 12px;
+    }
+    .mock-link {
+      width: 28px;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+    }
+    .mock-hero {
+      padding: 20px 0;
+    }
+    .mock-h1-line {
+      height: 14px;
+      border-radius: 4px;
+      background: var(--border-strong);
+      margin-bottom: 10px;
+    }
+    .mock-sub-line {
+      height: 8px;
+      border-radius: 3px;
+      background: var(--border);
+      margin-bottom: 7px;
+    }
+
+    /* ── Widget preview (inside right panel) ── */
+    #widget-preview-root {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+    }
+    .wp-prompt {
+      background: #fff;
+      border: 1px solid #e4e4e4;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      cursor: pointer;
+      max-width: 260px;
+      transition: all 0.2s;
+    }
+    .wp-prompt:hover {
+      box-shadow: 0 8px 28px rgba(0,0,0,0.13);
+      transform: translateY(-1px);
+    }
+    .wp-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .wp-text { font-size: 10px; color: #1a1a1a; line-height: 1.4; }
+    .wp-sub { font-size: 8px; color: #aaa; margin-top: 2px; }
+
+    .wp-open {
+      background: #fff;
+      border: 1px solid #e4e4e4;
+      border-radius: 16px;
+      width: 280px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 400px;
+    }
+    .wp-header {
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background 0.3s;
+    }
+    .wp-header-left {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .wp-status { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; }
+    .wp-title { font-size: 9px; color: #fff; letter-spacing: 0.1em; }
+    .wp-x { background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 15px; }
+    .wp-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 120px;
+      max-height: 240px;
+    }
+    .wp-messages::-webkit-scrollbar { width: 2px; }
+    .wp-messages::-webkit-scrollbar-thumb { background: #eee; }
+    .wp-msg-label { font-size: 7px; color: #ccc; letter-spacing: 0.12em; margin-bottom: 3px; }
+    .wp-bubble {
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-size: 9px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .wp-bubble.user { background: #f8f8f8; border: 1px solid #eee; color: #333; }
+    .wp-bubble.agent { background: #fff; border: 1px solid #f0f0f0; color: #333; }
+    .wp-fit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .wp-fit-label { font-size: 7px; color: #999; }
+    .wp-fit-score { font-size: 11px; font-weight: 600; }
+    .wp-fit-bar { flex: 1; height: 2px; background: #f0f0f0; border-radius: 1px; overflow: hidden; }
+    .wp-fit-fill { height: 100%; border-radius: 1px; transition: width 0.4s; }
+    .wp-slot-btn {
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 8px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      margin-top: 3px;
+      font-family: 'DM Mono', monospace;
+      transition: all 0.15s;
+    }
+    .wp-typing { display: flex; gap: 3px; padding: 3px 0; }
+    .wp-dot {
+      width: 4px; height: 4px; border-radius: 50%; background: #ddd;
+      animation: wpdot 1s ease-in-out infinite;
+    }
+    .wp-dot:nth-child(2) { animation-delay: 0.2s; }
+    .wp-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes wpdot { 0%,100% { opacity: 0.2; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.1); } }
+    .wp-input-row {
+      padding: 8px 10px;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      gap: 6px;
+    }
+    .wp-input {
+      flex: 1;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 9px;
+      outline: none;
+      font-family: 'DM Mono', monospace;
+      color: #333;
+      background: #fafafa;
+    }
+    .wp-send {
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      padding: 6px 12px;
+      font-size: 9px;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      transition: opacity 0.15s;
+    }
+    .wp-send:hover { opacity: 0.85; }
+    .wp-hint-btn {
+      background: #f8f8f8;
+      border: 1px solid #eee;
+      border-radius: 5px;
+      padding: 5px 8px;
+      font-size: 8px;
+      color: #666;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 4px;
+      transition: background 0.15s;
+    }
+    .wp-hint-btn:hover { background: #f0f0f0; }
+
+    /* ── Install output ── */
+    .output-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .output-tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .output-tab {
+      padding: 10px 16px;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      font-family: 'DM Mono', monospace;
+    }
+    .output-tab.active {
+      color: var(--ink);
+      border-bottom-color: var(--ink);
+    }
+    .output-body { display: none; }
+    .output-body.active { display: block; }
+    .code-out {
+      background: #111;
+      padding: 20px;
+      font-size: 10px;
+      line-height: 1.8;
+      color: #a8c8a0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      position: relative;
+    }
+    .copy-out-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #222;
+      border: none;
+      color: #888;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 8px;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.1em;
+      transition: all 0.2s;
+    }
+    .copy-out-btn:hover { background: #333; color: #fff; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .step-content.active { animation: fadeUp 0.3s ease; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">⬡</div>
+    <span class="logo-name">Moon</span>
+    <span class="logo-tag">CONFIGURE</span>
+  </div>
+  <div class="header-actions">
+    <a href="index.html" style="font-size:9px;color:var(--muted);text-decoration:none;letter-spacing:0.1em;">← Back to site</a>
+    <button class="btn btn-ghost" onclick="resetForm()">Reset</button>
+    <button class="btn btn-primary" onclick="goToStep(4)" id="install-btn">Get install snippet →</button>
+  </div>
+</header>
+
+<!-- Steps bar -->
+<div class="steps-bar">
+  <div class="step-item active" id="step-nav-0" onclick="goToStep(0)">
+    <div class="step-num active" id="step-num-0">1</div>
+    <span class="step-label">Brand</span>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step-nav-1" onclick="goToStep(1)">
+    <div class="step-num idle" id="step-num-1">2</div>
+    <span class="step-label">Product</span>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step-nav-2" onclick="goToStep(2)">
+    <div class="step-num idle" id="step-num-2">3</div>
+    <span class="step-label">Fit criteria</span>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step-nav-3" onclick="goToStep(3)">
+    <div class="step-num idle" id="step-num-3">4</div>
+    <span class="step-label">Booking</span>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step-item" id="step-nav-4" onclick="goToStep(4)">
+    <div class="step-num idle" id="step-num-4">5</div>
+    <span class="step-label">Install</span>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Form panel -->
+  <div class="form-panel">
+
+    <!-- Step 0: Brand -->
+    <div class="step-content active" id="step-0">
+      <h2 class="step-heading">Tell Moon about<br /><em>your brand.</em></h2>
+      <p class="step-sub">This is how Moon identifies itself to visiting agents and how the widget looks on your site.</p>
+
+      <div class="field">
+        <div class="field-label">COMPANY NAME <span class="field-hint">Required</span></div>
+        <input type="text" id="brand-name" placeholder="e.g. Qualified" oninput="updatePreview()" />
+      </div>
+
+      <div class="field">
+        <div class="field-label">BRAND COLOR</div>
+        <div class="color-row">
+          <input type="color" class="color-input" id="brand-color" value="#1c1c1a" oninput="syncColor(this.value)" />
+          <input type="text" class="color-hex" id="brand-color-hex" value="#1c1c1a" placeholder="#1c1c1a" oninput="syncColorHex(this.value)" />
+        </div>
+        <div class="color-swatches">
+          <div class="swatch selected" style="background:#1c1c1a" onclick="pickSwatch('#1c1c1a',this)"></div>
+          <div class="swatch" style="background:#1d4ed8" onclick="pickSwatch('#1d4ed8',this)"></div>
+          <div class="swatch" style="background:#0f766e" onclick="pickSwatch('#0f766e',this)"></div>
+          <div class="swatch" style="background:#7c3aed" onclick="pickSwatch('#7c3aed',this)"></div>
+          <div class="swatch" style="background:#b45309" onclick="pickSwatch('#b45309',this)"></div>
+          <div class="swatch" style="background:#be123c" onclick="pickSwatch('#be123c',this)"></div>
+          <div class="swatch" style="background:#374151" onclick="pickSwatch('#374151',this)"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">WIDGET PROMPT TEXT <span class="field-hint">What visitors see first</span></div>
+        <input type="text" id="widget-prompt" placeholder="AI agent? Faster path here." oninput="updatePreview()" maxlength="60" />
+        <div class="field-note">Keep it short. This is the first thing an agent sees.</div>
+      </div>
+
+      <div class="step-nav">
+        <span class="step-progress">STEP 1 OF 5</span>
+        <button class="btn btn-primary" onclick="goToStep(1)">Next: Product →</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Product -->
+    <div class="step-content" id="step-1">
+      <h2 class="step-heading">What does your<br /><em>product do?</em></h2>
+      <p class="step-sub">One sentence is enough. The agent needs to understand what problem you solve, not your full pitch deck.</p>
+
+      <div class="field">
+        <div class="field-label">ONE-LINE DESCRIPTION <span class="field-hint">Required</span></div>
+        <textarea id="product-description" rows="2" placeholder="e.g. Qualified helps B2B sales teams convert website visitors into pipeline using AI-powered conversations." oninput="updatePreview()"></textarea>
+      </div>
+
+      <div class="field">
+        <div class="field-label">WHAT IT SOLVES <span class="field-hint">Press Enter to add each item</span></div>
+        <div class="tag-input-wrap" id="solves-wrap" onclick="focusTagInput('solves-input')">
+          <input class="tag-ghost-input" id="solves-input" placeholder="Type a problem and press Enter..."
+            onkeydown="handleTagInput(event,'solves')" />
+        </div>
+        <div class="field-note">2–3 specific problems. Not features — problems.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">PROOF POINT <span class="field-hint">Optional but powerful</span></div>
+        <input type="text" id="product-proof" placeholder="e.g. Customers include Cisco and Adobe. Average 4x pipeline increase." oninput="updatePreview()" />
+        <div class="field-note">One result or one customer name. Something an agent can relay to its human.</div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="goToStep(0)">← Back</button>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="step-progress">STEP 2 OF 5</span>
+          <button class="btn btn-primary" onclick="goToStep(2)">Next: Fit criteria →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Fit -->
+    <div class="step-content" id="step-2">
+      <h2 class="step-heading">Who is this<br /><em>actually for?</em></h2>
+      <p class="step-sub">This is how Moon decides whether to offer a demo or give an honest exit. Be specific — vague criteria produce bad fit scores.</p>
+
+      <div class="field">
+        <div class="field-label" style="color:#16a34a;">✓ BEST FIT FOR <span class="field-hint" style="color:var(--muted)">Press Enter to add</span></div>
+        <div class="tag-input-wrap" id="bestfit-wrap" onclick="focusTagInput('bestfit-input')">
+          <input class="tag-ghost-input" id="bestfit-input" placeholder="e.g. B2B SaaS companies"
+            onkeydown="handleTagInput(event,'bestfit')" />
+        </div>
+        <div class="field-note">Company type, size, tech stack, revenue. Each item is a +2 to the fit score.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label" style="color:#dc2626;">✗ NOT A FIT FOR <span class="field-hint" style="color:var(--muted)">Press Enter to add</span></div>
+        <div class="tag-input-wrap" id="notfit-wrap" onclick="focusTagInput('notfit-input')">
+          <input class="tag-ghost-input" id="notfit-input" placeholder="e.g. B2C or ecommerce brands"
+            onkeydown="handleTagInput(event,'notfit')" />
+        </div>
+        <div class="field-note">Dealbreakers. Any match here triggers an honest exit — no demo offered. This builds trust.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">THE ONE QUALIFYING QUESTION <span class="field-hint">Optional</span></div>
+        <input type="text" id="must-have" placeholder="e.g. Salesforce CRM" oninput="updatePreview()" />
+        <div class="field-note">When Moon is unsure, it asks one question. What's your single most important qualifier?</div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="goToStep(1)">← Back</button>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="step-progress">STEP 3 OF 5</span>
+          <button class="btn btn-primary" onclick="goToStep(3)">Next: Booking →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Booking -->
+    <div class="step-content" id="step-3">
+      <h2 class="step-heading">Where should<br /><em>demos get booked?</em></h2>
+      <p class="step-sub">Drop in any booking link. Calendly, Cal.com, HubSpot meetings — anything with a URL. Moon opens it in a new tab when an agent selects a slot.</p>
+
+      <div class="field">
+        <div class="field-label">BOOKING LINK <span class="field-hint">Required</span></div>
+        <input type="url" id="booking-link" placeholder="https://calendly.com/your-link" oninput="updatePreview()" />
+        <div class="field-note">Works with Calendly, Cal.com, HubSpot, Chili Piper, or any URL.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">MEETING LENGTH</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" id="len-15" onclick="setLength(15)" style="font-size:10px;">15 min</button>
+          <button class="btn btn-primary" id="len-20" onclick="setLength(20)" style="font-size:10px;">20 min</button>
+          <button class="btn btn-ghost" id="len-30" onclick="setLength(30)" style="font-size:10px;">30 min</button>
+          <button class="btn btn-ghost" id="len-45" onclick="setLength(45)" style="font-size:10px;">45 min</button>
+        </div>
+        <div class="field-note">Shown to the agent when offering a demo. Shorter = more bookings.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">CONFIRMATION MESSAGE</div>
+        <textarea id="booking-confirm" rows="2" placeholder="Demo confirmed. A calendar invite will follow shortly." oninput="updatePreview()"></textarea>
+        <div class="field-note">Shown after the agent books. Relayed back to the human.</div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="goToStep(2)">← Back</button>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="step-progress">STEP 4 OF 5</span>
+          <button class="btn btn-primary" onclick="goToStep(4)">Get install snippet →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Install -->
+    <div class="step-content" id="step-4">
+      <h2 class="step-heading">You're ready<br /><em>to install.</em></h2>
+      <p class="step-sub">Download both files and upload them to your website. Then paste the script tag before your closing &lt;/body&gt; tag.</p>
+
+      <div class="output-panel">
+        <div class="output-tab-bar">
+          <button class="output-tab active" onclick="switchTab('snippet')">SCRIPT TAG</button>
+          <button class="output-tab" onclick="switchTab('config')">moon.config.md</button>
+        </div>
+        <div class="output-body active" id="tab-snippet">
+          <div class="code-out" id="snippet-out"></div>
+          <button class="copy-out-btn" onclick="copyOut('snippet-out')">COPY</button>
+        </div>
+        <div class="output-body" id="tab-config">
+          <div class="code-out" id="config-out" style="max-height:320px;overflow-y:auto;"></div>
+          <button class="copy-out-btn" onclick="copyOut('config-out')">COPY</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px;">
+        <button class="btn btn-primary" onclick="downloadConfig()">↓ Download moon.config.md</button>
+        <button class="btn btn-ghost" onclick="downloadJS()">↓ Download moon.js</button>
+      </div>
+
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:20px;">
+        <div style="font-size:9px;letter-spacing:0.2em;color:var(--muted);margin-bottom:12px;">CHECKLIST</div>
+        <div id="checklist"></div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="goToStep(3)">← Back</button>
+        <a href="https://github.com/yourusername/moon" target="_blank" class="btn btn-ghost" style="text-decoration:none;">View on GitHub →</a>
+      </div>
+    </div>
+
+  </div><!-- /form-panel -->
+
+  <!-- Preview panel -->
+  <div class="preview-panel">
+    <div class="preview-header">
+      <span>LIVE PREVIEW</span>
+      <div class="preview-live">
+        <div class="live-dot"></div>
+        <span>Updates as you type</span>
+      </div>
+    </div>
+    <div class="preview-site">
+      <div class="mock-site">
+        <div class="mock-nav">
+          <div class="mock-logo-pill" id="mock-logo-pill"></div>
+          <div class="mock-nav-links">
+            <div class="mock-link"></div>
+            <div class="mock-link"></div>
+            <div class="mock-link"></div>
+          </div>
+        </div>
+        <div class="mock-hero">
+          <div class="mock-h1-line" style="width:85%"></div>
+          <div class="mock-h1-line" style="width:60%"></div>
+          <div style="height:16px"></div>
+          <div class="mock-sub-line" style="width:90%"></div>
+          <div class="mock-sub-line" style="width:75%"></div>
+          <div class="mock-sub-line" style="width:50%"></div>
+        </div>
+      </div>
+      <div id="widget-preview-root"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+const state = {
+  brand: { name: '', color: '#1c1c1a', prompt: '' },
+  product: { description: '', solves: [], proof: '' },
+  fit: { bestFor: [], notFor: [], mustHave: '' },
+  booking: { link: '', length: 20, confirm: '' },
+};
+
+let currentStep = 0;
+let widgetOpen = false;
+let widgetMessages = [];
+let widgetShowSlots = false;
+let meetingLength = 20;
+let outputTab = 'snippet';
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function goToStep(n) {
+  document.querySelectorAll('.step-content').forEach((el, i) => {
+    el.classList.toggle('active', i === n);
+  });
+  document.querySelectorAll('.step-item').forEach((el, i) => {
+    el.classList.toggle('active', i === n);
+    el.classList.toggle('done', i < n);
+  });
+  document.querySelectorAll('.step-num').forEach((el, i) => {
+    el.className = 'step-num ' + (i < n ? 'done' : i === n ? 'active' : 'idle');
+    el.textContent = i < n ? '✓' : i + 1;
+  });
+  currentStep = n;
+  if (n === 4) buildInstallOutput();
+}
+
+// ── Color ─────────────────────────────────────────────────────────────────────
+function syncColor(val) {
+  state.brand.color = val;
+  document.getElementById('brand-color-hex').value = val;
+  updateSwatchSelection(val);
+  updatePreview();
+}
+function syncColorHex(val) {
+  if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+    state.brand.color = val;
+    document.getElementById('brand-color').value = val;
+    updateSwatchSelection(val);
+    updatePreview();
+  }
+}
+function pickSwatch(hex, el) {
+  state.brand.color = hex;
+  document.getElementById('brand-color').value = hex;
+  document.getElementById('brand-color-hex').value = hex;
+  updateSwatchSelection(hex);
+  updatePreview();
+}
+function updateSwatchSelection(hex) {
+  document.querySelectorAll('.swatch').forEach(s => {
+    s.classList.toggle('selected', s.style.background.toLowerCase() === hex.toLowerCase() ||
+      s.style.backgroundColor === hexToRgb(hex));
+  });
+}
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// ── Tag inputs ────────────────────────────────────────────────────────────────
+const tags = { solves: [], bestfit: [], notfit: [] };
+
+function focusTagInput(id) { document.getElementById(id)?.focus(); }
+
+function handleTagInput(e, key) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.trim().replace(/,$/, '');
+    if (val) addTag(key, val);
+    e.target.value = '';
+  } else if (e.key === 'Backspace' && !e.target.value && tags[key].length) {
+    removeTag(key, tags[key].length - 1);
+  }
+}
+
+function addTag(key, val) {
+  tags[key].push(val);
+  renderTags(key);
+  syncTagsToState();
+}
+
+function removeTag(key, i) {
+  tags[key].splice(i, 1);
+  renderTags(key);
+  syncTagsToState();
+}
+
+function renderTags(key) {
+  const wrap = document.getElementById(key + '-wrap');
+  const input = document.getElementById(key + '-input');
+  wrap.querySelectorAll('.tag').forEach(t => t.remove());
+  tags[key].forEach((val, i) => {
+    const tag = document.createElement('div');
+    tag.className = 'tag' + (key === 'notfit' ? ' bad' : '');
+    tag.innerHTML = `${val}<span class="tag-remove" onclick="removeTag('${key}',${i})">×</span>`;
+    wrap.insertBefore(tag, input);
+  });
+  updatePreview();
+}
+
+function syncTagsToState() {
+  state.product.solves = tags.solves;
+  state.fit.bestFor = tags.bestfit;
+  state.fit.notFor = tags.notfit;
+}
+
+// ── Read form ─────────────────────────────────────────────────────────────────
+function readForm() {
+  state.brand.name = document.getElementById('brand-name').value.trim() || 'Your Company';
+  state.brand.color = document.getElementById('brand-color').value;
+  state.brand.prompt = document.getElementById('widget-prompt').value.trim() || 'AI agent? Faster path here.';
+  state.product.description = document.getElementById('product-description').value.trim();
+  state.product.proof = document.getElementById('product-proof').value.trim();
+  state.fit.mustHave = document.getElementById('must-have').value.trim();
+  state.booking.link = document.getElementById('booking-link').value.trim();
+  state.booking.confirm = document.getElementById('booking-confirm').value.trim() || 'Demo confirmed. A calendar invite will follow shortly.';
+  syncTagsToState();
+}
+
+// ── Meeting length ────────────────────────────────────────────────────────────
+function setLength(n) {
+  meetingLength = n;
+  state.booking.length = n;
+  [15,20,30,45].forEach(l => {
+    const btn = document.getElementById('len-' + l);
+    if (btn) {
+      btn.className = 'btn ' + (l === n ? 'btn-primary' : 'btn-ghost');
+      btn.style.fontSize = '10px';
+    }
+  });
+  updatePreview();
+}
+
+// ── Fit scoring ───────────────────────────────────────────────────────────────
+function scoreText(text) {
+  const lower = text.toLowerCase();
+  let score = 0;
+  state.fit.bestFor.forEach(c => {
+    const kw = c.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3);
+    if (kw.some(k => lower.includes(k))) score += 2;
+  });
+  state.fit.notFor.forEach(c => {
+    const kw = c.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3);
+    if (kw.some(k => lower.includes(k))) score -= 4;
+  });
+  return Math.max(0, Math.min(10, score));
+}
+
+function getAgentResponse(text, histLen) {
+  const lower = text.toLowerCase();
+  const score = scoreText(text);
+  const isBad = state.fit.notFor.some(c =>
+    c.toLowerCase().split(/[\s,]+/).filter(w=>w.length>3).some(k=>lower.includes(k))
+  );
+  const isGood = score >= 4 && state.fit.bestFor.some(c =>
+    c.toLowerCase().split(/[\s,]+/).filter(w=>w.length>3).some(k=>lower.includes(k))
+  );
+
+  if (histLen === 0 || /^(hi|hello|hey|start|help)/.test(lower)) {
+    const desc = state.product.description || `${state.brand.name || 'This product'} — tell me about your company and I'll give you a straight fit assessment.`;
+    return { text: desc, score: null, action: null };
+  }
+  if (isBad) {
+    return { text: `Based on what you've shared, this isn't a fit. I won't waste your principal's time on a demo that won't land.`, score: 1, action: null };
+  }
+  if (isGood) {
+    const proof = state.product.proof ? `\n\n${state.product.proof}` : '';
+    return {
+      text: `Fit looks strong.${proof}\n\nA ${meetingLength}-minute call would confirm everything.`,
+      score, action: 'booking'
+    };
+  }
+  if (histLen >= 1 && state.fit.mustHave) {
+    return { text: `One question: does your principal use ${state.fit.mustHave}?`, score: null, action: null };
+  }
+  if (histLen >= 2) {
+    return { text: `There's enough here for a ${meetingLength}-minute call — no commitment needed.`, score: 5, action: 'booking' };
+  }
+  const solves = state.product.solves.length ? `We address:\n${state.product.solves.map(s=>`· ${s}`).join('\n')}\n\nDoes any of that match?` : `Tell me more about your company and what you're trying to solve.`;
+  return { text: solves, score: null, action: null };
+}
+
+// ── Widget preview ────────────────────────────────────────────────────────────
+function updatePreview() {
+  readForm();
+  const root = document.getElementById('widget-preview-root');
+  if (!root) return;
+  const color = state.brand.color;
+  const name = state.brand.name || 'Your Company';
+  const prompt = state.brand.prompt || 'AI agent? Faster path here.';
+
+  if (!widgetOpen) {
+    root.innerHTML = `
+      <div class="wp-prompt" onclick="openWidget()">
+        <div class="wp-icon" id="wp-icon" style="background:${color}">⬡</div>
+        <div>
+          <div class="wp-text">${escHtml(prompt)}</div>
+          <div class="wp-sub">Agent interface · ${escHtml(name)}</div>
+        </div>
+      </div>`;
+  } else {
+    renderOpenWidget(color, name);
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openWidget() {
+  widgetOpen = true;
+  widgetMessages = [];
+  widgetShowSlots = false;
+  updatePreview();
+  // Auto greet
+  setTimeout(() => {
+    const resp = getAgentResponse('', 0);
+    widgetMessages.push({ role: 'agent', text: resp.text, score: resp.score, action: resp.action });
+    if (resp.action === 'booking') widgetShowSlots = true;
+    renderOpenWidget(state.brand.color, state.brand.name);
+  }, 400);
+}
+
+function closeWidget() {
+  widgetOpen = false;
+  widgetMessages = [];
+  widgetShowSlots = false;
+  updatePreview();
+}
+
+function renderOpenWidget(color, name) {
+  const root = document.getElementById('widget-preview-root');
+  if (!root) return;
+
+  let msgsHtml = '';
+  if (widgetMessages.length === 0) {
+    msgsHtml = `
+      <button class="wp-hint-btn" onclick="wSend('We\\'re B2B SaaS, 200 employees, use Salesforce')">We're B2B SaaS, 200 employees, use Salesforce</button>
+      <button class="wp-hint-btn" onclick="wSend('What does this solve?')">What does this solve?</button>
+      <button class="wp-hint-btn" onclick="wSend('We\\'re an ecommerce brand')">We're an ecommerce brand</button>`;
+  } else {
+    widgetMessages.forEach((m, idx) => {
+      const fitHtml = m.score != null ? `
+        <div class="wp-fit-row">
+          <span class="wp-fit-label">FIT</span>
+          <span class="wp-fit-score" style="color:${fitColor(m.score)}">${m.score}/10</span>
+          <div class="wp-fit-bar"><div class="wp-fit-fill" style="width:${m.score*10}%;background:${fitColor(m.score)}"></div></div>
+        </div>` : '';
+      msgsHtml += `
+        <div>
+          <div class="wp-msg-label">${m.role==='user'?'PROSPECT_AGENT':'MOON'}</div>
+          <div class="wp-bubble ${m.role}">${fitHtml}${escHtml(m.text)}</div>
+          ${m.action==='booking' && widgetShowSlots ? getSlotsHtml(color) : ''}
+        </div>`;
+    });
+  }
+
+  root.innerHTML = `
+    <div class="wp-open">
+      <div class="wp-header" style="background:${color}">
+        <div class="wp-header-left">
+          <div class="wp-status"></div>
+          <div class="wp-title">MOON · ${escHtml(name||'Your Company')}</div>
+        </div>
+        <button class="wp-x" onclick="closeWidget()">×</button>
+      </div>
+      <div class="wp-messages" id="wp-msgs">${msgsHtml}</div>
+      <div class="wp-input-row">
+        <input class="wp-input" id="wp-input" placeholder="Describe your company..." onkeydown="if(event.key==='Enter')wSend()" />
+        <button class="wp-send" style="background:${color}" onclick="wSend()">→</button>
+      </div>
+    </div>`;
+
+  const msgs = document.getElementById('wp-msgs');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function getSlotsHtml(color) {
+  const slots = ['Tomorrow 10:00am', 'Wednesday 2:00pm', 'Thursday 11:00am'];
+  return slots.map(s => `
+    <button class="wp-slot-btn" style="background:#fff;border:1px solid ${color};color:${color};"
+      onmouseover="this.style.background='${color}';this.style.color='#fff'"
+      onmouseout="this.style.background='#fff';this.style.color='${color}'"
+      onclick="wBook('${s}')">Book → ${s}</button>`).join('');
+}
+
+function fitColor(s) {
+  return s >= 7 ? '#16a34a' : s >= 4 ? '#ca8a04' : '#dc2626';
+}
+
+function wSend(text) {
+  const input = document.getElementById('wp-input');
+  const msg = text || input?.value.trim();
+  if (!msg) return;
+  if (input) input.value = '';
+  widgetShowSlots = false;
+  widgetMessages.push({ role: 'user', text: msg });
+  renderOpenWidget(state.brand.color, state.brand.name);
+  // typing
+  const msgs = document.getElementById('wp-msgs');
+  if (msgs) {
+    const t = document.createElement('div');
+    t.className = 'wp-typing'; t.id = 'wp-typing';
+    t.innerHTML = '<div class="wp-dot"></div><div class="wp-dot"></div><div class="wp-dot"></div>';
+    msgs.appendChild(t); msgs.scrollTop = msgs.scrollHeight;
+  }
+  setTimeout(() => {
+    const resp = getAgentResponse(msg, widgetMessages.filter(m=>m.role==='agent').length);
+    widgetMessages.push({ role: 'agent', text: resp.text, score: resp.score, action: resp.action });
+    if (resp.action === 'booking') widgetShowSlots = true;
+    renderOpenWidget(state.brand.color, state.brand.name);
+  }, 500);
+}
+
+function wBook(slot) {
+  widgetShowSlots = false;
+  widgetMessages.push({ role: 'agent', text: `Demo confirmed · ${slot}\n${state.booking.confirm || 'A calendar invite will follow shortly.'}`, score: null, action: null });
+  renderOpenWidget(state.brand.color, state.brand.name);
+}
+
+// ── Install output ────────────────────────────────────────────────────────────
+function buildInstallOutput() {
+  readForm();
+  const color = state.brand.color;
+  const snippet = `<!-- Moon Agent Widget · getmoon.io -->
+<script
+  src="moon.js"
+  data-config="moon.config.md"
+  data-color="${color}"
+  async defer>
+<\/script>`;
+
+  const solves = state.product.solves.length
+    ? state.product.solves.map(s => `- ${s}`).join('\n')
+    : '- Problem 1\n- Problem 2';
+  const bestFor = state.fit.bestFor.length
+    ? state.fit.bestFor.map(s => `- ${s}`).join('\n')
+    : '- Add best fit criteria';
+  const notFor = state.fit.notFor.length
+    ? state.fit.notFor.map(s => `- ${s}`).join('\n')
+    : '- Add dealbreakers';
+  const proof = state.product.proof ? `- ${state.product.proof}` : '- Add a proof point';
+
+  const config = `# Product
+Name: ${state.brand.name || 'Your Company'}
+Description: ${state.product.description || 'Add a one-line description.'}
+
+# What it solves
+${solves}
+
+# Best fit for
+${bestFor}
+
+# Not a fit for
+${notFor}
+
+# Proof
+${proof}
+
+# Book a demo
+Link: ${state.booking.link || 'https://calendly.com/your-link'}
+Length: ${meetingLength} minutes
+Must have: ${state.fit.mustHave || 'Add your key qualifier'}`;
+
+  document.getElementById('snippet-out').textContent = snippet;
+  document.getElementById('config-out').textContent = config;
+  buildChecklist();
+}
+
+function buildChecklist() {
+  const items = [
+    { label: 'Company name added', ok: !!document.getElementById('brand-name').value.trim() },
+    { label: 'Product description written', ok: !!document.getElementById('product-description').value.trim() },
+    { label: 'Best fit criteria added', ok: tags.bestfit.length > 0 },
+    { label: 'Dealbreakers added', ok: tags.notfit.length > 0 },
+    { label: 'Booking link added', ok: !!document.getElementById('booking-link').value.trim() },
+  ];
+  document.getElementById('checklist').innerHTML = items.map(item => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="color:${item.ok?'#16a34a':'#e5e5e0'};font-size:14px;">${item.ok?'✓':'○'}</span>
+      <span style="font-size:10px;color:${item.ok?'var(--ink)':'var(--muted)'};">${item.label}</span>
+    </div>`).join('');
+}
+
+function switchTab(tab) {
+  outputTab = tab;
+  document.querySelectorAll('.output-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0&&tab==='snippet')||(i===1&&tab==='config'));
+  });
+  document.getElementById('tab-snippet').classList.toggle('active', tab==='snippet');
+  document.getElementById('tab-config').classList.toggle('active', tab==='config');
+}
+
+function copyOut(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard?.writeText(text).then(() => {
+    const btn = document.querySelector(`[onclick="copyOut('${id}')"]`);
+    if (btn) { btn.textContent = 'COPIED ✓'; btn.style.color = '#4ade80'; }
+    setTimeout(() => { if (btn) { btn.textContent = 'COPY'; btn.style.color = ''; } }, 2000);
+  });
+}
+
+function downloadConfig() {
+  const text = document.getElementById('config-out').textContent;
+  const a = document.createElement('a');
+  a.href = 'data:text/markdown;charset=utf-8,' + encodeURIComponent(text);
+  a.download = 'moon.config.md';
+  a.click();
+}
+
+function downloadJS() {
+  window.open('moon.js', '_blank');
+}
+
+function resetForm() {
+  if (!confirm('Reset all fields?')) return;
+  document.querySelectorAll('input[type=text],input[type=url],textarea').forEach(el => el.value = '');
+  document.getElementById('brand-color').value = '#1c1c1a';
+  document.getElementById('brand-color-hex').value = '#1c1c1a';
+  Object.keys(tags).forEach(k => { tags[k] = []; renderTags(k); });
+  state.brand.color = '#1c1c1a';
+  setLength(20);
+  widgetOpen = false;
+  widgetMessages = [];
+  goToStep(0);
+  updatePreview();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+updatePreview();
+</script>
+
+</body>
+</html>

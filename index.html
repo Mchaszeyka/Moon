@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moon — Agent-Native Sales Widget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black: #111110;
+      --white: #fafaf8;
+      --ink: #2a2a28;
+      --muted: #888880;
+      --border: #e8e8e4;
+      --accent: #111110;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--white);
+      color: var(--ink);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 16px 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(250,250,248,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; }
+    .nav-logo-icon {
+      width: 28px; height: 28px; background: var(--black);
+      border-radius: 6px; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-size: 13px;
+    }
+    .nav-logo-name { font-size: 13px; color: var(--black); letter-spacing: 0.05em; }
+    .nav-links { display: flex; gap: 32px; }
+    .nav-links a {
+      font-size: 10px; color: var(--muted); text-decoration: none;
+      letter-spacing: 0.1em; transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--black); }
+    .nav-cta {
+      background: var(--black); color: #fff;
+      padding: 8px 20px; border-radius: 6px;
+      font-size: 10px; text-decoration: none;
+      letter-spacing: 0.1em; transition: opacity 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.8; }
+
+    /* ── Sections ── */
+    section { padding: 120px 48px; }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      justify-content: center;
+      padding-top: 140px;
+      border-bottom: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: 0; right: 0;
+      width: 50%; height: 100%;
+      background: radial-gradient(ellipse at 80% 40%, #f0f0ec, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-size: 9px; color: var(--muted);
+      letter-spacing: 0.3em; margin-bottom: 28px;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(40px, 5vw, 72px);
+      line-height: 1.1; font-weight: normal;
+      max-width: 720px; margin-bottom: 32px;
+      color: var(--black);
+    }
+    .hero h1 em { font-style: italic; color: var(--muted); }
+    .hero-sub {
+      font-size: 12px; color: var(--muted);
+      max-width: 480px; line-height: 1.8;
+      margin-bottom: 48px;
+    }
+    .hero-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--black); color: #fff;
+      padding: 12px 28px; border-radius: 8px;
+      font-size: 10px; text-decoration: none;
+      letter-spacing: 0.1em; transition: opacity 0.2s;
+      font-family: 'DM Mono', monospace;
+    }
+    .btn-primary:hover { opacity: 0.8; }
+    .btn-secondary {
+      font-size: 10px; color: var(--muted);
+      text-decoration: none; letter-spacing: 0.1em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2px; transition: color 0.2s;
+    }
+    .btn-secondary:hover { color: var(--black); }
+    .hero-note {
+      margin-top: 64px;
+      font-size: 9px; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .hero-note::before {
+      content: '↓';
+      animation: bounce 2s ease-in-out infinite;
+    }
+    @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+
+    /* ── How it works ── */
+    .how { border-bottom: 1px solid var(--border); }
+    .section-label {
+      font-size: 9px; color: var(--muted);
+      letter-spacing: 0.3em; margin-bottom: 48px;
+    }
+    .how h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px, 3.5vw, 48px);
+      line-height: 1.2; font-weight: normal;
+      max-width: 600px; margin-bottom: 80px;
+      color: var(--black);
+    }
+    .how h2 em { font-style: italic; color: var(--muted); }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 48px; }
+    .step-num {
+      font-family: 'DM Serif Display', serif;
+      font-size: 48px; color: var(--border);
+      line-height: 1; margin-bottom: 16px;
+    }
+    .step-title { font-size: 13px; color: var(--black); margin-bottom: 8px; }
+    .step-body { font-size: 10px; color: var(--muted); line-height: 1.7; }
+
+    /* ── Flow ── */
+    .flow { background: var(--black); color: #fff; border-bottom: 1px solid #222; }
+    .flow .section-label { color: #555; }
+    .flow h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px, 3.5vw, 48px);
+      font-weight: normal; max-width: 560px;
+      margin-bottom: 64px; line-height: 1.2;
+    }
+    .flow h2 em { font-style: italic; color: #888; }
+    .flow-steps {
+      display: flex; flex-wrap: wrap;
+      align-items: center; gap: 0;
+    }
+    .flow-node {
+      background: #1a1a18; border: 1px solid #2a2a28;
+      padding: 20px 24px; min-width: 160px;
+    }
+    .flow-node.active { border-color: #555; }
+    .flow-node-title { font-size: 12px; color: #fff; margin-bottom: 6px; }
+    .flow-node-sub { font-size: 9px; color: #555; line-height: 1.5; }
+    .flow-arrow { font-size: 18px; color: #333; padding: 0 12px; }
+
+    /* ── Install ── */
+    .install { border-bottom: 1px solid var(--border); }
+    .install h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px, 3.5vw, 48px);
+      font-weight: normal; max-width: 560px;
+      margin-bottom: 16px; line-height: 1.2;
+    }
+    .install-sub { font-size: 11px; color: var(--muted); margin-bottom: 48px; line-height: 1.7; max-width: 480px; }
+    .code-block {
+      background: #111110; border-radius: 10px;
+      padding: 28px; margin-bottom: 16px;
+      position: relative; max-width: 640px;
+    }
+    .code-block pre {
+      font-size: 11px; color: #a8c8a0;
+      line-height: 1.8; white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .copy-btn {
+      position: absolute; top: 16px; right: 16px;
+      background: #222; border: none; color: #888;
+      padding: 6px 12px; border-radius: 4px;
+      font-size: 9px; cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.1em; transition: all 0.2s;
+    }
+    .copy-btn:hover { background: #333; color: #fff; }
+    .install-note { font-size: 10px; color: var(--muted); line-height: 1.7; max-width: 480px; }
+
+    /* ── Config ── */
+    .config-section { border-bottom: 1px solid var(--border); background: #f5f5f0; }
+    .config-section h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(24px, 3vw, 40px);
+      font-weight: normal; margin-bottom: 16px;
+    }
+    .config-sub { font-size: 11px; color: var(--muted); margin-bottom: 48px; max-width: 480px; line-height: 1.7; }
+    .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; max-width: 900px; }
+    .config-item-label {
+      font-size: 9px; letter-spacing: 0.2em; color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .config-item-title { font-size: 14px; color: var(--black); margin-bottom: 6px; }
+    .config-item-body { font-size: 10px; color: var(--muted); line-height: 1.7; }
+
+    /* ── Free ── */
+    .free-section { border-bottom: 1px solid var(--border); }
+    .free-section h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px, 3.5vw, 48px);
+      font-weight: normal; margin-bottom: 64px;
+    }
+    .free-section h2 em { font-style: italic; color: var(--muted); }
+    .free-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border); max-width: 800px;
+    }
+    .free-item { background: var(--white); padding: 24px; }
+    .free-item-icon { font-size: 20px; margin-bottom: 12px; }
+    .free-item-title { font-size: 12px; color: var(--black); margin-bottom: 6px; }
+    .free-item-body { font-size: 10px; color: var(--muted); line-height: 1.6; }
+
+    /* ── CTA ── */
+    .cta-section { text-align: center; }
+    .cta-section h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(28px, 3.5vw, 52px);
+      font-weight: normal; margin-bottom: 16px;
+      max-width: 560px; margin-left: auto; margin-right: auto;
+    }
+    .cta-sub { font-size: 11px; color: var(--muted); margin-bottom: 40px; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 32px 48px;
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 16px;
+    }
+    footer a {
+      font-size: 9px; color: var(--muted);
+      text-decoration: none; letter-spacing: 0.1em;
+      transition: color 0.2s;
+    }
+    footer a:hover { color: var(--black); }
+    .footer-links { display: flex; gap: 24px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      nav { padding: 14px 20px; }
+      nav .nav-links { display: none; }
+      section { padding: 80px 20px; }
+      .config-grid { grid-template-columns: 1fr; }
+      .flow-steps { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      footer { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-logo">
+      <div class="nav-logo-icon">⬡</div>
+      <span class="nav-logo-name">Moon</span>
+    </div>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="#config">Configure</a>
+      <a href="https://github.com/yourusername/moon" target="_blank">GitHub</a>
+    </div>
+    <a href="https://github.com/yourusername/moon" target="_blank" class="nav-cta">
+      Get started →
+    </a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-eyebrow">OPEN SOURCE · FREE FOREVER · MIT LICENSE</div>
+    <h1>AI agents are visiting<br />your website.<br /><em>Are you ready for them?</em></h1>
+    <p class="hero-sub">
+      Moon is a one-line script that gives any AI agent visiting your site a faster, structured path — honest fit assessment, no docs required, demo booked when it's a match.
+    </p>
+    <div class="hero-actions">
+      <a href="https://github.com/yourusername/moon" target="_blank" class="btn-primary">
+        Fork on GitHub →
+      </a>
+      <a href="#how" class="btn-secondary">See how it works</a>
+    </div>
+    <div class="hero-note">The widget in the bottom right corner is Moon, running live on this page</div>
+  </section>
+
+  <!-- How it works -->
+  <section class="how" id="how">
+    <div class="section-label">HOW IT WORKS</div>
+    <h2>The agent gets answers.<br /><em>You get a booked demo.</em></h2>
+    <div class="steps">
+      <div>
+        <div class="step-num">01</div>
+        <div class="step-title">Agent lands on your site</div>
+        <div class="step-body">Any AI assistant doing research on behalf of a buyer sees Moon's prompt immediately — before reading a single doc page.</div>
+      </div>
+      <div>
+        <div class="step-num">02</div>
+        <div class="step-title">Moon assesses fit</div>
+        <div class="step-body">Two or three questions. Moon scores the prospect against your ICP criteria and gives an honest assessment — including when it's not a fit.</div>
+      </div>
+      <div>
+        <div class="step-num">03</div>
+        <div class="step-title">Demo offered</div>
+        <div class="step-body">When fit is confirmed, Moon surfaces available slots from your Calendly link. The agent books directly on behalf of its human.</div>
+      </div>
+      <div>
+        <div class="step-num">04</div>
+        <div class="step-title">Human gets a meeting</div>
+        <div class="step-body">The recommendation comes from their own AI assistant — not a vendor. That's the highest-trust referral channel that exists.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Flow -->
+  <section class="flow">
+    <div class="section-label">THE FLOW</div>
+    <h2>Agent to agent.<br /><em>Human gets the outcome.</em></h2>
+    <div class="flow-steps">
+      <div class="flow-node">
+        <div class="flow-node-title">Prospect's<br />AI Agent</div>
+        <div class="flow-node-sub">Researching on<br />behalf of a buyer</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node active">
+        <div class="flow-node-title">Moon<br />Widget</div>
+        <div class="flow-node-sub">Fit scored.<br />Demo offered.</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="flow-node-title">Agent carries<br />back result</div>
+        <div class="flow-node-sub">Recommendation<br />+ booked slot</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="flow-node-title">Human sees<br />demo on calendar</div>
+        <div class="flow-node-sub">From their own<br />trusted agent</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section class="install" id="install">
+    <div class="section-label">INSTALL</div>
+    <h2>One line.<br />That's it.</h2>
+    <p class="install-sub">
+      Paste this before your closing &lt;/body&gt; tag. Loads async — your site is completely unaffected if Moon is slow or unavailable.
+    </p>
+    <div class="code-block">
+      <pre id="snippet">&lt;script
+  src="https://yourusername.github.io/moon/moon.js"
+  data-config="moon.config.md"
+  data-color="#1a1a1a"
+  async defer&gt;
+&lt;/script&gt;</pre>
+      <button class="copy-btn" onclick="copySnippet()">COPY</button>
+    </div>
+    <p class="install-note">
+      Runs entirely in the browser. No backend required. No API keys. No data leaves the visitor's session. Your config file lives on your own server.
+    </p>
+  </section>
+
+  <!-- Config -->
+  <section class="config-section" id="config">
+    <div class="section-label">CONFIGURE</div>
+    <h2>Edit one markdown file.</h2>
+    <p class="config-sub">
+      Moon reads moon.config.md from your server. Edit it in any text editor. No code, no dashboard, no login required.
+    </p>
+    <div class="code-block" style="max-width:540px;margin-bottom:48px;">
+      <pre style="color:#c8d8a0;"># Product
+Name: Your Company
+Description: One sentence. What it does, who it's for.
+
+# What it solves
+- Problem you solve
+- Another problem
+
+# Best fit for
+- B2B SaaS companies
+- Uses Salesforce CRM
+
+# Not a fit for
+- B2C brands
+- No website traffic
+
+# Proof
+- Customer outcome or name
+
+# Book a demo
+Link: https://calendly.com/your-link
+Length: 20 minutes
+Must have: Salesforce CRM</pre>
+    </div>
+    <div class="config-grid">
+      <div>
+        <div class="config-item-label">FIT DETECTION</div>
+        <div class="config-item-title">Best fit for + Not a fit for</div>
+        <div class="config-item-body">Moon scores the agent's description against these lists. Dealbreakers trigger an honest exit. Two matches trigger a demo offer.</div>
+      </div>
+      <div>
+        <div class="config-item-label">BOOKING</div>
+        <div class="config-item-title">Drop in your Calendly link</div>
+        <div class="config-item-body">Moon generates available slots and opens your Calendly link when the agent selects one. No calendar API integration required.</div>
+      </div>
+      <div>
+        <div class="config-item-label">UPDATES</div>
+        <div class="config-item-title">Edit the markdown, done</div>
+        <div class="config-item-body">Change your product description, add a proof point, update the Calendly link. Moon reads the file fresh on every session.</div>
+      </div>
+      <div>
+        <div class="config-item-label">HONEST EXITS</div>
+        <div class="config-item-title">Not a fit for matters</div>
+        <div class="config-item-body">Moon tells prospect agents when there's a clear mismatch. That honesty is what makes it trustworthy — and trustworthy agents get engaged.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Free -->
+  <section class="free-section">
+    <div class="section-label">PRICING</div>
+    <h2>Free.<br /><em>Forever.</em></h2>
+    <div class="free-grid">
+      <div class="free-item">
+        <div class="free-item-icon">⬡</div>
+        <div class="free-item-title">The widget</div>
+        <div class="free-item-body">Full agent-to-agent conversation, fit scoring, demo booking. No feature limits.</div>
+      </div>
+      <div class="free-item">
+        <div class="free-item-icon">◎</div>
+        <div class="free-item-title">Self-hosted</div>
+        <div class="free-item-body">Your code, your server, your data. No account. No vendor lock-in. Fork and go.</div>
+      </div>
+      <div class="free-item">
+        <div class="free-item-icon">○</div>
+        <div class="free-item-title">MIT licensed</div>
+        <div class="free-item-body">Use it, modify it, build on it. No restrictions for commercial use.</div>
+      </div>
+      <div class="free-item">
+        <div class="free-item-icon">◇</div>
+        <div class="free-item-title">No dependencies</div>
+        <div class="free-item-body">Vanilla JavaScript. No npm, no framework, no API keys required.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="section-label">GET STARTED</div>
+    <h2>Agent traffic is hitting your site right now.</h2>
+    <p class="cta-sub">It's converting at zero percent. Fix that in five minutes.</p>
+    <a href="https://github.com/yourusername/moon" target="_blank" class="btn-primary">
+      Fork on GitHub →
+    </a>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="nav-logo">
+      <div class="nav-logo-icon">⬡</div>
+      <span class="nav-logo-name">Moon</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/yourusername/moon" target="_blank">GitHub</a>
+      <a href="https://github.com/yourusername/moon/blob/main/README.md" target="_blank">Docs</a>
+      <a href="https://github.com/yourusername/moon/issues" target="_blank">Issues</a>
+    </div>
+    <span style="font-size:9px;color:#bbb;letter-spacing:0.1em;">MIT LICENSE · OPEN SOURCE</span>
+  </footer>
+
+  <!-- Moon widget running live on this page -->
+  <script src="moon.js" data-config="moon.config.md" data-color="#111110" async defer></script>
+
+  <script>
+    function copySnippet() {
+      const text = document.getElementById("snippet").textContent;
+      navigator.clipboard?.writeText(text).then(() => {
+        const btn = document.querySelector(".copy-btn");
+        btn.textContent = "COPIED ✓";
+        btn.style.color = "#4ade80";
+        setTimeout(() => { btn.textContent = "COPY"; btn.style.color = ""; }, 2000);
+      });
+    }
+  </script>
+
+</body>
+</html>

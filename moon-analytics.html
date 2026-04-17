@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Moon — Analytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f6f2; --surface: #fff; --border: #e8e6e0;
+      --ink: #1c1c1a; --muted: #8a8880; --radius: 10px;
+      --green: #16a34a; --yellow: #ca8a04; --red: #dc2626;
+    }
+    body { background: var(--bg); color: var(--ink); font-family: 'DM Mono', monospace; font-size: 12px; min-height: 100vh; }
+
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 32px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-mark { width: 28px; height: 28px; background: var(--ink); border-radius: 7px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; }
+    .logo-name { font-size: 13px; letter-spacing: 0.05em; }
+    .logo-tag { font-size: 9px; color: var(--muted); padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; letter-spacing: 0.1em; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    #last-updated { font-size: 9px; color: var(--muted); letter-spacing: 0.08em; }
+    .btn { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em; padding: 7px 16px; border-radius: 7px; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); color: var(--ink); }
+    .btn-primary { background: var(--ink); color: #fff; }
+    .btn-primary:hover { opacity: 0.85; }
+
+    .setup-banner {
+      background: #fefce8; border-bottom: 1px solid #fef08a;
+      padding: 12px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .setup-text { font-size: 10px; color: #854d0e; line-height: 1.6; }
+    .setup-text strong { color: #713f12; }
+    .setup-input {
+      display: flex; gap: 8px; align-items: center;
+    }
+    #apps-script-url {
+      border: 1px solid #fde68a; border-radius: 6px; padding: 7px 12px;
+      font-size: 10px; font-family: 'DM Mono', monospace;
+      width: 320px; outline: none; background: #fff;
+    }
+    #apps-script-url:focus { border-color: #ca8a04; }
+
+    main { padding: 32px; max-width: 1200px; margin: 0 auto; }
+
+    .section-label { font-size: 9px; color: var(--muted); letter-spacing: 0.3em; margin-bottom: 16px; }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 32px; }
+    .stat-card { background: var(--surface); padding: 24px 20px; }
+    .stat-value { font-family: 'Instrument Serif', serif; font-size: 40px; line-height: 1; margin-bottom: 6px; color: var(--ink); }
+    .stat-label { font-size: 9px; color: var(--muted); letter-spacing: 0.15em; margin-bottom: 4px; }
+    .stat-delta { font-size: 9px; color: var(--green); }
+    .stat-delta.warn { color: var(--yellow); }
+    .stat-delta.neutral { color: var(--muted); }
+
+    /* Chart */
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 32px; }
+    .chart-title { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 20px; }
+    #event-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+    .chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .chart-bar { width: 100%; border-radius: 3px 3px 0 0; transition: height 0.4s ease; min-height: 2px; background: var(--ink); opacity: 0.15; }
+    .chart-bar.has-data { opacity: 1; }
+    .chart-bar-label { font-size: 7px; color: var(--muted); text-align: center; }
+
+    /* Session table */
+    .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 32px; }
+    .table-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .table-title { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead tr { background: #f8f8f6; }
+    th { padding: 10px 16px; text-align: left; font-size: 8px; letter-spacing: 0.2em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; font-weight: normal; }
+    td { padding: 12px 16px; font-size: 10px; color: var(--ink); border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafaf8; }
+    .event-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 8px; letter-spacing: 0.1em; white-space: nowrap; }
+    .event-pill.widget_loaded { background: #f0f0ec; color: var(--muted); }
+    .event-pill.widget_opened { background: #eff6ff; color: #1d4ed8; }
+    .event-pill.session_start { background: #f0fdf4; color: var(--green); }
+    .event-pill.message_sent { background: #fafaf8; color: var(--muted); }
+    .event-pill.booking_offered { background: #fefce8; color: var(--yellow); }
+    .event-pill.booking_clicked { background: #f0fdf4; color: var(--green); font-weight: bold; }
+    .event-pill.widget_closed { background: #fef2f2; color: var(--red); }
+    .fit-badge { display: inline-block; font-size: 10px; font-weight: 600; }
+    .yes-badge { color: var(--green); }
+    .no-badge { color: var(--muted); }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 64px 24px; color: var(--muted); }
+    .empty-icon { font-size: 32px; margin-bottom: 16px; opacity: 0.3; }
+    .empty-title { font-size: 14px; color: var(--ink); margin-bottom: 8px; font-family: 'Instrument Serif', serif; }
+    .empty-sub { font-size: 10px; line-height: 1.7; max-width: 360px; margin: 0 auto; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 48px; color: var(--muted); font-size: 10px; letter-spacing: 0.15em; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--ink); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+
+    /* Setup instructions */
+    .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; margin-bottom: 32px; }
+    .setup-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 24px; }
+    .setup-step-num { font-family: 'Instrument Serif', serif; font-size: 32px; color: var(--border); margin-bottom: 8px; }
+    .setup-step-title { font-size: 12px; color: var(--ink); margin-bottom: 6px; }
+    .setup-step-body { font-size: 10px; color: var(--muted); line-height: 1.7; }
+    .setup-step-code { background: #111; color: #a8c8a0; padding: 8px 12px; border-radius: 6px; font-size: 9px; margin-top: 8px; line-height: 1.6; word-break: break-all; }
+
+    @media (max-width: 640px) {
+      header { padding: 0 16px; }
+      main { padding: 20px 16px; }
+      .setup-banner { padding: 12px 16px; }
+      #apps-script-url { width: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">⬡</div>
+    <span class="logo-name">Moon</span>
+    <span class="logo-tag">ANALYTICS</span>
+  </div>
+  <div class="header-right">
+    <span id="last-updated">Not connected</span>
+    <button class="btn btn-ghost" onclick="refresh()">↺ Refresh</button>
+    <a href="moon-admin.html" class="btn btn-primary" style="text-decoration:none;">Configure →</a>
+  </div>
+</header>
+
+<!-- Setup banner -->
+<div class="setup-banner" id="setup-banner">
+  <div class="setup-text">
+    <strong>Connect your Google Apps Script</strong> — paste your deployment URL below to see live session data.
+  </div>
+  <div class="setup-input">
+    <input type="url" id="apps-script-url" placeholder="https://script.google.com/macros/s/..." />
+    <button class="btn btn-primary" onclick="connectScript()">Connect</button>
+  </div>
+</div>
+
+<main>
+
+  <!-- Stats -->
+  <div class="section-label" id="stats-label" style="display:none">OVERVIEW</div>
+  <div class="stats-grid" id="stats-grid" style="display:none">
+    <div class="stat-card">
+      <div class="stat-label">SESSIONS</div>
+      <div class="stat-value" id="stat-sessions">—</div>
+      <div class="stat-delta neutral" id="stat-sessions-delta">Total agent interactions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">WIDGET OPENS</div>
+      <div class="stat-value" id="stat-opens">—</div>
+      <div class="stat-delta neutral">Agents engaged</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">AVG FIT SCORE</div>
+      <div class="stat-value" id="stat-fit">—</div>
+      <div class="stat-delta neutral">Out of 10</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">BOOKINGS OFFERED</div>
+      <div class="stat-value" id="stat-offered">—</div>
+      <div class="stat-delta neutral">Strong fit detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">BOOKINGS CLICKED</div>
+      <div class="stat-value" id="stat-booked">—</div>
+      <div class="stat-delta" id="stat-booked-delta">Calendly opened</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">CONVERSION</div>
+      <div class="stat-value" id="stat-conversion">—</div>
+      <div class="stat-delta neutral">Sessions → bookings</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-card" id="chart-card" style="display:none">
+    <div class="chart-title">EVENTS · LAST 14 DAYS</div>
+    <div id="event-chart"></div>
+  </div>
+
+  <!-- Setup instructions (shown when not connected) -->
+  <div class="setup-card" id="setup-card">
+    <div class="section-label">HOW TO SET UP ANALYTICS</div>
+    <div class="setup-steps">
+      <div>
+        <div class="setup-step-num">01</div>
+        <div class="setup-step-title">Open Google Apps Script</div>
+        <div class="setup-step-body">Go to <strong>script.google.com</strong>, create a new project called "Moon Analytics", and paste the contents of <strong>moon-analytics.gs</strong>.</div>
+      </div>
+      <div>
+        <div class="setup-step-num">02</div>
+        <div class="setup-step-title">Deploy as web app</div>
+        <div class="setup-step-body">Click Deploy → New deployment → Web app. Set Execute as: <strong>Me</strong>. Who has access: <strong>Anyone</strong>. Copy the URL.</div>
+      </div>
+      <div>
+        <div class="setup-step-num">03</div>
+        <div class="setup-step-title">Add to moon.js script tag</div>
+        <div class="setup-step-body">Add the URL to your script tag:
+          <div class="setup-step-code">data-analytics="YOUR_URL"</div>
+        </div>
+      </div>
+      <div>
+        <div class="setup-step-num">04</div>
+        <div class="setup-step-title">Paste URL above</div>
+        <div class="setup-step-body">Paste your Apps Script deployment URL in the banner above and click Connect. Sessions will appear here as agents interact with Moon.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sessions table -->
+  <div class="table-card" id="sessions-table" style="display:none">
+    <div class="table-header">
+      <span class="table-title">RECENT SESSIONS</span>
+      <span style="font-size:9px;color:var(--muted);" id="session-count"></span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>TIME</th>
+            <th>EVENT</th>
+            <th>SESSION ID</th>
+            <th>PAGE</th>
+            <th>FIT SCORE</th>
+            <th>MESSAGES</th>
+            <th>BOOKING OFFERED</th>
+            <th>BOOKING CLICKED</th>
+            <th>FIRST MESSAGE</th>
+          </tr>
+        </thead>
+        <tbody id="sessions-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading" style="display:none">
+    <div class="spinner"></div>
+    FETCHING SESSION DATA...
+  </div>
+
+  <!-- Empty -->
+  <div class="empty" id="empty-state" style="display:none">
+    <div class="empty-icon">⬡</div>
+    <div class="empty-title">No sessions yet</div>
+    <div class="empty-sub">Moon is connected. Sessions will appear here as soon as an agent or human interacts with the widget on your site.</div>
+  </div>
+
+</main>
+
+<script>
+  let scriptUrl = localStorage.getItem("moon_analytics_url") || null;
+  let sessions = [];
+
+  // Restore saved URL
+  if (scriptUrl) {
+    document.getElementById("apps-script-url").value = scriptUrl;
+    document.getElementById("setup-banner").style.background = "#f0fdf4";
+    document.getElementById("setup-banner").style.borderBottomColor = "#bbf7d0";
+    loadData();
+  }
+
+  function connectScript() {
+    const url = document.getElementById("apps-script-url").value.trim();
+    if (!url || !url.startsWith("https://script.google.com")) {
+      alert("Please paste a valid Google Apps Script URL starting with https://script.google.com");
+      return;
+    }
+    scriptUrl = url;
+    localStorage.setItem("moon_analytics_url", url);
+    document.getElementById("setup-banner").style.background = "#f0fdf4";
+    document.getElementById("setup-banner").style.borderBottomColor = "#bbf7d0";
+    loadData();
+  }
+
+  function refresh() {
+    if (!scriptUrl) return;
+    loadData();
+  }
+
+  async function loadData() {
+    if (!scriptUrl) return;
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("setup-card").style.display = "none";
+    document.getElementById("sessions-table").style.display = "none";
+    document.getElementById("stats-grid").style.display = "none";
+    document.getElementById("stats-label").style.display = "none";
+    document.getElementById("chart-card").style.display = "none";
+    document.getElementById("empty-state").style.display = "none";
+
+    try {
+      const res = await fetch(scriptUrl);
+      const data = await res.json();
+      sessions = Array.isArray(data) ? data : [];
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("last-updated").textContent = "Updated " + new Date().toLocaleTimeString();
+
+      if (sessions.length === 0) {
+        document.getElementById("empty-state").style.display = "block";
+        return;
+      }
+
+      renderStats();
+      renderChart();
+      renderTable();
+
+    } catch (err) {
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("last-updated").textContent = "Connection error";
+      document.getElementById("setup-card").style.display = "block";
+      console.error("Moon analytics error:", err);
+    }
+  }
+
+  function renderStats() {
+    document.getElementById("stats-grid").style.display = "grid";
+    document.getElementById("stats-label").style.display = "block";
+
+    const total = sessions.length;
+    const opens = sessions.filter(s => s["Event"] === "widget_opened").length;
+    const fitScores = sessions.filter(s => s["Fit Score"] && !isNaN(+s["Fit Score"])).map(s => +s["Fit Score"]);
+    const avgFit = fitScores.length ? (fitScores.reduce((a,b)=>a+b,0)/fitScores.length).toFixed(1) : "—";
+    const offered = sessions.filter(s => s["Booking Offered"] === "Yes").length;
+    const booked = sessions.filter(s => s["Booking Clicked"] === "Yes").length;
+    const conversion = total > 0 ? Math.round((booked/total)*100) + "%" : "0%";
+
+    document.getElementById("stat-sessions").textContent = total;
+    document.getElementById("stat-opens").textContent = opens;
+    document.getElementById("stat-fit").textContent = avgFit;
+    document.getElementById("stat-offered").textContent = offered;
+    document.getElementById("stat-booked").textContent = booked;
+    document.getElementById("stat-conversion").textContent = conversion;
+
+    const bookedDelta = document.getElementById("stat-booked-delta");
+    bookedDelta.textContent = booked > 0 ? `↑ ${booked} Calendly opens` : "None yet";
+    bookedDelta.className = "stat-delta " + (booked > 0 ? "" : "neutral");
+  }
+
+  function renderChart() {
+    document.getElementById("chart-card").style.display = "block";
+    const chart = document.getElementById("event-chart");
+    chart.innerHTML = "";
+
+    // Build last 14 days
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      days.push({ label: d.toLocaleDateString("en-US",{weekday:"short"}), date: d.toDateString(), count: 0 });
+    }
+
+    sessions.forEach(s => {
+      const ts = s["Timestamp"];
+      if (!ts) return;
+      const d = new Date(ts).toDateString();
+      const day = days.find(day => day.date === d);
+      if (day) day.count++;
+    });
+
+    const maxCount = Math.max(...days.map(d => d.count), 1);
+
+    days.forEach(day => {
+      const wrap = document.createElement("div"); wrap.className = "chart-bar-wrap";
+      const bar = document.createElement("div"); bar.className = "chart-bar" + (day.count > 0 ? " has-data" : "");
+      bar.style.height = Math.max(2, (day.count / maxCount) * 76) + "px";
+      bar.title = `${day.count} event${day.count !== 1 ? "s" : ""}`;
+      const label = document.createElement("div"); label.className = "chart-bar-label"; label.textContent = day.label;
+      wrap.appendChild(bar); wrap.appendChild(label); chart.appendChild(wrap);
+    });
+  }
+
+  function renderTable() {
+    document.getElementById("sessions-table").style.display = "block";
+    document.getElementById("session-count").textContent = sessions.length + " events";
+    const tbody = document.getElementById("sessions-tbody");
+    tbody.innerHTML = "";
+
+    sessions.slice(0, 50).forEach(s => {
+      const tr = document.createElement("tr");
+      const ts = s["Timestamp"] ? new Date(s["Timestamp"]).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}) : "—";
+      const event = s["Event"] || "";
+      const sessionId = (s["Session ID"] || "").slice(0, 12);
+      const page = s["Page URL"] ? new URL(s["Page URL"]).pathname : "—";
+      const fit = s["Fit Score"] ? `<span class="fit-badge" style="color:${fitColor(+s["Fit Score"])}">${s["Fit Score"]}/10</span>` : "—";
+      const msgs = s["Messages Exchanged"] || "0";
+      const offered = s["Booking Offered"] === "Yes" ? `<span class="yes-badge">Yes</span>` : `<span class="no-badge">—</span>`;
+      const clicked = s["Booking Clicked"] === "Yes" ? `<span class="yes-badge">✓ Yes</span>` : `<span class="no-badge">—</span>`;
+      const firstMsg = s["First Message"] ? `<span title="${s["First Message"]}">${s["First Message"].slice(0,40)}${s["First Message"].length > 40 ? "…" : ""}</span>` : "—";
+
+      tr.innerHTML = `
+        <td>${ts}</td>
+        <td><span class="event-pill ${event}">${event.replace(/_/g," ")}</span></td>
+        <td style="color:var(--muted);font-size:9px;">${sessionId}</td>
+        <td style="color:var(--muted);">${page}</td>
+        <td>${fit}</td>
+        <td style="text-align:center;">${msgs}</td>
+        <td>${offered}</td>
+        <td>${clicked}</td>
+        <td style="color:var(--muted);font-size:9px;">${firstMsg}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function fitColor(s) {
+    return s >= 7 ? "#16a34a" : s >= 4 ? "#ca8a04" : "#dc2626";
+  }
+
+  // Auto-refresh every 60 seconds if connected
+  setInterval(() => { if (scriptUrl) loadData(); }, 60000);
+</script>
+</body>
+</html>
