@@ -11,9 +11,11 @@ export async function middleware(req) {
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/login") ||
+    pathname.startsWith("/share") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {
+    // /share/[token] is intentionally public — read-only trip boards the owner published.
     return NextResponse.next();
   }
   const pw = process.env.DASHBOARD_PASSWORD;

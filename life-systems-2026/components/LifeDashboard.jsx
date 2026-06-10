@@ -2,7 +2,7 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Check, Plus, X, Minus, ChevronRight, ChevronLeft, Send, Trophy, Download, Mail } from "lucide-react";
+import { Check, Plus, X, Minus, ChevronRight, ChevronLeft, Send, Trophy, Download, Mail, Activity, MapPin, Share2, Copy, Image as ImageIcon, Upload, RefreshCw } from "lucide-react";
 
 /* localStorage adapter — replaces the claude.ai artifact storage API */
 const storage = {
@@ -161,6 +161,34 @@ function fmtDate(iso) {
 }
 const mapOldPillar = (p) => (p === "certs" ? "professional" : p === "household" ? "home" : PILLAR_COLORS[p] ? p : "professional");
 
+/* ---- Strava / fitness formatting (kilometers) ---- */
+const FIT = "#30B85C"; // Fitness pillar color
+const MARATHON_M = 42195;
+const fmtKm = (m) => (!m ? "0" : (m / 1000).toFixed(m >= 10000 ? 0 : 1));
+const fmtDur = (s) => { s = Math.round(s || 0); const h = Math.floor(s / 3600); const m = Math.round((s % 3600) / 60); return h ? `${h}:${String(m).padStart(2, "0")}` : `${m} min`; };
+const fmtPace = (mps) => { if (!mps) return "—"; const spk = 1000 / mps; const m = Math.floor(spk / 60); const s = Math.round(spk % 60); return `${m}:${String(s).padStart(2, "0")}/km`; };
+const SPORT_GLYPH = { Run: "🏃", TrailRun: "⛰️", Walk: "🚶", Hike: "🥾", Workout: "💪", Crossfit: "🏋️", WeightTraining: "🏋️", Ride: "🚴", Swim: "🏊", Yoga: "🧘" };
+const sportGlyph = (s) => SPORT_GLYPH[s] || "✦";
+const shortDate = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+
+/* Compact training summary fed to the AI assistant so it can coach load vs. recovery. */
+function buildTrainingFeed(strava) {
+  const s = strava?.summary;
+  if (!s) return null;
+  const recent4 = s.weekly.slice(-4);
+  const avg4 = recent4.length ? recent4.reduce((t, w) => t + w.meters, 0) / recent4.length / 1000 : 0;
+  return {
+    thisWeekKm: +(s.thisWeek.meters / 1000).toFixed(1),
+    thisWeekRuns: s.thisWeek.runs,
+    lastWeekKm: +(s.lastWeek.meters / 1000).toFixed(1),
+    avg4WeekKm: +avg4.toFixed(1),
+    longestRunKm: +(s.longestRunMeters / 1000).toFixed(1),
+    lastRunDaysAgo: s.lastRunDaysAgo,
+    recentRaces: s.races.slice(0, 3).map((r) => `${r.name} (${shortDate(r.date)}, ${fmtKm(r.distance)}km, ${r.prs} PRs)`),
+    marathonDistanceKm: 42.2,
+  };
+}
+
 /* ---- birthday & horoscope helpers ---- */
 const ZODIAC = [
   ["Capricorn", "♑", 1, 19], ["Aquarius", "♒", 2, 18], ["Pisces", "♓", 3, 20], ["Aries", "♈", 4, 19],
@@ -235,6 +263,7 @@ function buildSystemPrompt(data, todayISO) {
     profile: data.profile && data.profile.birthday ? { birthday: data.profile.birthday, sign: zodiacFor(data.profile.birthday).name } : "birthday not set yet",
     groceries: (data.groceries || []).map((g) => ({ id: g.id, text: g.text, done: g.done })),
     notes: data.notes,
+    training: buildTrainingFeed(data.strava),
   };
   return `You are Mia's personal life-operations assistant, embedded in her 2026 Life Systems dashboard. Mia is a Success Architect at Qualified (Salesforce), a runner training toward a March 2027 marathon, and a memoir essayist (Substack). Pillars: Professional + Certs, Fitness, Health & Beauty, Creative, Family, Home.
 
@@ -245,6 +274,7 @@ Your role is full operational support:
 1. UPDATE: when Mia reports progress, completions, bookings, or wins, translate them into actions.
 2. SUGGEST: proactively recommend changes — rebalancing pillars, filling neglected areas (e.g., if Health or Family has no recent activity), sequencing tasks, protecting her Sunday study blocks. Make suggestions in "reply"; only execute them as actions if she's clearly asked or agreed.
 3. ANSWER: answer questions about her schedule, progress, and priorities from the state above.
+4. COACH (when "training" is present — live Strava data, km): factor real training load into advice. If this week's volume is well above her 4-week average, or she's run many days in a row, or just raced, nudge recovery (easy days, protect sleep, keep the Sunday block light). If she's been off for several days and has capacity, encourage picking it back up. Be specific with her numbers; never prescribe medical advice.
 
 Respond with ONLY a valid JSON object — no markdown, no code fences:
 {"reply":"conversational reply (concise, specific, honest — no flattery)","actions":[...]}
@@ -452,6 +482,17 @@ export default function LifeOpsDashboard() {
   const [bdayInput, setBdayInput] = useState("");
   const [groceryInput, setGroceryInput] = useState("");
   const [horoLoading, setHoroLoading] = useState(false);
+  /* fitness (Strava) */
+  const [stravaState, setStravaState] = useState("idle"); // idle | loading | ready | unconfigured | error
+  const stravaFetched = useRef(false);
+  /* travel mood boards */
+  const [boards, setBoards] = useState(null);
+  const [travelState, setTravelState] = useState("idle"); // idle | loading | saving | unconfigured | error
+  const [openBoard, setOpenBoard] = useState(null);
+  const [newTrip, setNewTrip] = useState("");
+  const [uploadingBoard, setUploadingBoard] = useState(null);
+  const [shareBusy, setShareBusy] = useState(null);
+  const [copiedToken, setCopiedToken] = useState(null);
   const horoFetched = useRef(false);
   const saveTimer = useRef(null);
   const chatEndRef = useRef(null);
@@ -528,6 +569,130 @@ export default function LifeOpsDashboard() {
       refreshHoroscope(false);
     }
   }, [data, refreshHoroscope, todayISO]);
+
+  /* ---- Strava: auto-update marathon milestone (upward only) from real volume ---- */
+  const applyStravaHooks = useCallback((d, payload) => {
+    const s = payload?.summary;
+    if (!s) return;
+    const m = d.milestones.find((x) => /marathon/i.test(x.label));
+    if (m) {
+      const pct = Math.min(100, Math.round((s.longestRunMeters / MARATHON_M) * 100));
+      if (pct > m.progress) m.progress = pct; // never overwrite manual progress downward
+    }
+  }, []);
+
+  /* ---- Strava fetch (on first visit to Fitness tab) ---- */
+  useEffect(() => {
+    if (!data || tab !== "fitness" || stravaFetched.current) return;
+    stravaFetched.current = true;
+    setStravaState("loading");
+    (async () => {
+      try {
+        const r = await fetch("/api/strava");
+        if (r.status === 503) { setStravaState("unconfigured"); return; }
+        const j = await r.json();
+        if (!r.ok || j.error) { setStravaState("error"); return; }
+        setStravaState("ready");
+        update((d) => { d.strava = { fetchedAt: Date.now(), athlete: j.athlete, summary: j.summary }; applyStravaHooks(d, j); return d; });
+      } catch { setStravaState("error"); }
+    })();
+  }, [data, tab, update, applyStravaHooks]);
+
+  const refreshStrava = useCallback(async () => {
+    setStravaState("loading");
+    try {
+      const r = await fetch("/api/strava");
+      if (r.status === 503) { setStravaState("unconfigured"); return; }
+      const j = await r.json();
+      if (!r.ok || j.error) { setStravaState("error"); return; }
+      setStravaState("ready");
+      update((d) => { d.strava = { fetchedAt: Date.now(), athlete: j.athlete, summary: j.summary }; applyStravaHooks(d, j); return d; });
+    } catch { setStravaState("error"); }
+  }, [update, applyStravaHooks]);
+
+  const logRaceWin = (race) => update((d) => {
+    d.wins.unshift({ id: uid("w"), date: race.date, scope: "personal", pillar: "fitness", text: `${race.name} — ${fmtKm(race.distance)} km${race.prs ? `, ${race.prs} PRs` : ""}` });
+    return d;
+  });
+
+  const askCoach = () => {
+    if (thinking) return;
+    setTab("assistant");
+    setChatInput("");
+    setThinking(true);
+    const msg = "Based on my recent Strava training load, should I push or rest this week? Be specific with my numbers.";
+    const history = data.chat;
+    update((d) => { d.chat.push({ id: uid("c"), role: "user", text: msg }); return d; });
+    callAssistant(data, history, msg, todayISO)
+      .then((result) => update((d) => { const applied = applyActions(d, result.actions); d.chat.push({ id: uid("c"), role: "assistant", text: result.reply || "Done.", applied }); return d; }))
+      .catch(() => update((d) => { d.chat.push({ id: uid("c"), role: "assistant", text: "Connection hiccup — try again.", applied: [] }); return d; }))
+      .finally(() => setThinking(false));
+  };
+
+  /* ---- Travel boards (Vercel KV) ---- */
+  useEffect(() => {
+    if (tab !== "travel" || boards || travelState === "loading") return;
+    setTravelState("loading");
+    (async () => {
+      try {
+        const r = await fetch("/api/travel");
+        if (r.status === 503) { setBoards([]); setTravelState("unconfigured"); return; }
+        const j = await r.json();
+        setBoards(j.boards || []);
+        setTravelState("idle");
+      } catch { setBoards([]); setTravelState("error"); }
+    })();
+  }, [tab, boards, travelState]);
+
+  const saveBoards = useCallback(async (next) => {
+    setBoards(next);
+    setTravelState("saving");
+    try {
+      const r = await fetch("/api/travel", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ boards: next }) });
+      setTravelState(r.ok ? "idle" : "error");
+    } catch { setTravelState("error"); }
+  }, []);
+
+  const mutateBoard = (id, fn) => { const next = (boards || []).map((b) => (b.id === id ? fn({ ...b }) : b)); saveBoards(next); };
+  const patchLocal = (id, fn) => setBoards((bs) => (bs || []).map((b) => (b.id === id ? fn({ ...b }) : b))); // typing; persisted on blur
+
+  const createTrip = () => {
+    const title = newTrip.trim();
+    if (!title) return;
+    const b = { id: uid("trip"), title, destination: "", startDate: "", endDate: "", vibe: "", notes: "", photos: [], checklist: [], shareToken: null };
+    saveBoards([b, ...(boards || [])]);
+    setNewTrip("");
+    setOpenBoard(b.id);
+  };
+  const deleteTrip = (id) => { if (boards.find((b) => b.id === id)?.shareToken) toggleShare(id, "unpublish"); saveBoards((boards || []).filter((b) => b.id !== id)); if (openBoard === id) setOpenBoard(null); };
+
+  const uploadPhoto = async (id, file) => {
+    if (!file) return;
+    setUploadingBoard(id);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/travel/upload", { method: "POST", body: fd });
+      const j = await r.json();
+      if (j.url) mutateBoard(id, (b) => ({ ...b, photos: [...(b.photos || []), { url: j.url, caption: "" }] }));
+      else alert(j.error || "Upload failed");
+    } catch { alert("Upload failed"); }
+    setUploadingBoard(null);
+  };
+
+  const toggleShare = async (id, action) => {
+    setShareBusy(id);
+    try {
+      const r = await fetch("/api/travel/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ boardId: id, action }) });
+      const j = await r.json();
+      if (r.ok) setBoards((bs) => (bs || []).map((b) => (b.id === id ? { ...b, shareToken: j.shareToken } : b)));
+      else alert(j.error || "Could not update sharing");
+    } catch { alert("Could not update sharing"); }
+    setShareBusy(null);
+  };
+
+  const shareUrl = (token) => (typeof window !== "undefined" ? `${window.location.origin}/share/${token}` : `/share/${token}`);
+  const copyShare = (token) => { navigator.clipboard?.writeText(shareUrl(token)); setCopiedToken(token); setTimeout(() => setCopiedToken(null), 1800); };
 
   if (!data) {
     return <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.mono, color: T.inkSoft, fontSize: 13 }}>Loading your system…</div>;
@@ -690,6 +855,8 @@ export default function LifeOpsDashboard() {
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
         @keyframes pulse { 0%,100% { opacity: 0.4 } 50% { opacity: 1 } }
         @keyframes aurora { 0%,100% { transform: translate(0,0) scale(1) } 33% { transform: translate(-3%,2%) scale(1.06) } 66% { transform: translate(3%,-2%) scale(0.97) } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+        .spin { animation: spin 0.9s linear infinite; }
         ::-webkit-scrollbar { width: 8px } ::-webkit-scrollbar-thumb { background: #D2D2D7; border-radius: 4px }
       `}</style>
 
@@ -730,6 +897,8 @@ export default function LifeOpsDashboard() {
           <button style={tabBtn("calendar")} onClick={() => setTab("calendar")}>Calendar</button>
           <button style={tabBtn("wins")} onClick={() => setTab("wins")}>Wins</button>
           <button style={tabBtn("milestones")} onClick={() => setTab("milestones")}>Milestones</button>
+          <button style={tabBtn("fitness")} onClick={() => setTab("fitness")}>Fitness</button>
+          <button style={tabBtn("travel")} onClick={() => setTab("travel")}>Fun &amp; Travel</button>
           <span style={{ marginLeft: "auto", fontFamily: T.mono, fontSize: 11, color: saveState === "error" ? "#E86E5A" : T.inkSoft }}>
             {saveState === "saving" && "saving…"}{saveState === "saved" && "saved ✓"}{saveState === "error" && "save failed"}
           </span>
@@ -1133,6 +1302,253 @@ export default function LifeOpsDashboard() {
               </div>
             ) : (
               <button onClick={() => setMsForm((f) => ({ ...f, open: true }))} style={{ ...card, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: T.inkSoft, fontFamily: T.mono, fontSize: 12, justifyContent: "center", letterSpacing: "0.05em" }}><Plus size={14} /> ADD MILESTONE</button>
+            )}
+          </div>
+        )}
+
+        {/* ================= FITNESS (Strava) ================= */}
+        {tab === "fitness" && (() => {
+          const s = data.strava?.summary;
+          const ath = data.strava?.athlete;
+          const loading = stravaState === "loading" && !s;
+          const maxWeek = s ? Math.max(1, ...s.weekly.map((w) => w.meters)) : 1;
+          const wow = s ? s.thisWeek.meters - s.lastWeek.meters : 0;
+          const longestKm = s ? s.longestRunMeters / 1000 : 0;
+          const marathonPct = Math.min(100, Math.round((longestKm * 1000 / MARATHON_M) * 100));
+          const weeksToRace = Math.max(0, Math.round((new Date(2027, 2, 1) - today) / (7 * 864e5)));
+          const unloggedRaces = (s?.races || []).filter((r) => !data.wins.some((w) => w.text.startsWith(r.name)));
+          return (
+            <div style={{ display: "grid", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <Eyebrow>Fitness · Strava{ath?.firstName ? ` · ${ath.firstName}` : ""}</Eyebrow>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                  {s && <button onClick={askCoach} disabled={thinking} style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${FIT}`, background: "transparent", color: FIT, borderRadius: 999, padding: "6px 12px", fontFamily: T.mono, fontSize: 11, letterSpacing: "0.05em", cursor: thinking ? "default" : "pointer" }}><Activity size={13} /> ASK COACH</button>}
+                  <button onClick={refreshStrava} disabled={stravaState === "loading"} aria-label="Refresh Strava" style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${T.line}`, background: T.cardUp, color: T.inkSoft, borderRadius: 999, padding: "6px 12px", fontFamily: T.mono, fontSize: 11, letterSpacing: "0.05em", cursor: "pointer" }}><RefreshCw size={13} /> {stravaState === "loading" ? "…" : "REFRESH"}</button>
+                </div>
+              </div>
+
+              {stravaState === "unconfigured" && (
+                <div style={{ ...card }}>
+                  <div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Connect Strava</div>
+                  <div style={{ fontSize: 13.5, color: T.inkSoft, lineHeight: 1.7 }}>
+                    Add three environment variables in Vercel — <code style={{ fontFamily: T.mono, fontSize: 12 }}>STRAVA_CLIENT_ID</code>, <code style={{ fontFamily: T.mono, fontSize: 12 }}>STRAVA_CLIENT_SECRET</code>, and <code style={{ fontFamily: T.mono, fontSize: 12 }}>STRAVA_REFRESH_TOKEN</code> — then redeploy. The README's “Strava setup” section walks the one-time token mint (~5 min). Your credentials stay server-side and never reach the browser.
+                  </div>
+                </div>
+              )}
+              {stravaState === "error" && <div style={{ ...card, color: "#E86E5A", fontSize: 13.5 }}>Couldn’t reach Strava just now. Hit refresh to retry — the token may have expired or rate limits were hit.</div>}
+              {loading && <div style={{ ...card, fontFamily: T.mono, fontSize: 12.5, color: T.inkSoft, animation: "pulse 1.2s infinite" }}>pulling your training…</div>}
+
+              {s && (
+                <>
+                  {/* This week hero */}
+                  <div style={{ ...card, borderLeft: `3px solid ${FIT}` }}>
+                    <Eyebrow>This week</Eyebrow>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 26, alignItems: "flex-end" }}>
+                      {[
+                        { n: fmtKm(s.thisWeek.meters), u: "km run", l: `${s.thisWeek.runs} run${s.thisWeek.runs === 1 ? "" : "s"}` },
+                        { n: fmtDur(s.thisWeek.movingTime), u: "moving", l: `${s.thisWeek.activities} activities` },
+                        { n: Math.round(s.thisWeek.elevation), u: "m climb", l: "elevation" },
+                      ].map((x, i) => (
+                        <div key={i}>
+                          <div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 28 }}>{x.n}<span style={{ fontSize: 13, color: T.inkSoft, fontWeight: 500 }}> {x.u}</span></div>
+                          <div style={{ fontFamily: T.mono, fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: T.inkSoft, marginTop: 3 }}>{x.l}</div>
+                        </div>
+                      ))}
+                      <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                        <div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 20, color: wow >= 0 ? FIT : "#FF9500" }}>{wow >= 0 ? "▲" : "▼"} {fmtKm(Math.abs(wow))} km</div>
+                        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.inkSoft, marginTop: 3, letterSpacing: "0.05em" }}>VS LAST WEEK</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weekly mileage bars */}
+                  <div style={card}>
+                    <Eyebrow>Weekly mileage · last 12 weeks</Eyebrow>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 120, marginTop: 6 }}>
+                      {s.weekly.map((w, i) => {
+                        const isNow = i === s.weekly.length - 1;
+                        return (
+                          <div key={w.week} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }} title={`Week of ${shortDate(w.week)} — ${fmtKm(w.meters)} km, ${w.runs} runs`}>
+                            <div style={{ width: "100%", height: 96, display: "flex", alignItems: "flex-end" }}>
+                              <div style={{ width: "100%", height: `${(w.meters / maxWeek) * 100}%`, minHeight: w.meters ? 3 : 0, borderRadius: 5, background: isNow ? FIT : "rgba(48,184,92,0.28)", transition: "height 0.4s ease" }} />
+                            </div>
+                            <div style={{ fontFamily: T.mono, fontSize: 8.5, color: isNow ? FIT : T.inkSoft }}>{shortDate(w.week).split(" ")[1]}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Marathon build */}
+                  <div style={{ ...card, borderLeft: `3px solid ${PILLAR_COLORS.fitness}` }}>
+                    <Eyebrow>Marathon build · March 2027</Eyebrow>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "baseline" }}>
+                      <div><div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 24 }}>{fmtKm(s.longestRunMeters)} km</div><div style={{ fontFamily: T.mono, fontSize: 10, color: T.inkSoft, marginTop: 2, letterSpacing: "0.05em" }}>LONGEST RUN (90d)</div></div>
+                      <div><div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 24 }}>{fmtKm(s.ytdRunMeters)} km</div><div style={{ fontFamily: T.mono, fontSize: 10, color: T.inkSoft, marginTop: 2, letterSpacing: "0.05em" }}>YEAR TO DATE</div></div>
+                      <div><div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 24 }}>{weeksToRace}</div><div style={{ fontFamily: T.mono, fontSize: 10, color: T.inkSoft, marginTop: 2, letterSpacing: "0.05em" }}>WEEKS TO RACE</div></div>
+                    </div>
+                    <div style={{ marginTop: 14 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: T.mono, fontSize: 10.5, color: T.inkSoft, marginBottom: 6 }}><span>LONGEST RUN VS 42.2 KM</span><span>{marathonPct}%</span></div>
+                      <ProgressBar value={marathonPct} color={PILLAR_COLORS.fitness} />
+                      <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 8 }}>Auto-synced to your “Marathon base build” milestone.{s.lastRunDaysAgo != null ? ` Last run ${s.lastRunDaysAgo === 0 ? "today" : s.lastRunDaysAgo + "d ago"}.` : ""}</div>
+                    </div>
+                  </div>
+
+                  {/* Race -> wins offer */}
+                  {unloggedRaces.length > 0 && (
+                    <div style={{ ...card, background: "rgba(48,184,92,0.08)", border: `1px solid ${FIT}40` }}>
+                      <Eyebrow>Races to log as wins</Eyebrow>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {unloggedRaces.map((r) => (
+                          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <Trophy size={14} color={FIT} />
+                            <span style={{ fontSize: 14, flex: 1 }}>{r.name} · {fmtKm(r.distance)} km{r.prs ? ` · ${r.prs} PRs` : ""}</span>
+                            <button onClick={() => logRaceWin(r)} style={{ border: "none", background: FIT, color: "#FFF", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Log win</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent activities */}
+                  <div style={card}>
+                    <Eyebrow>Recent activities</Eyebrow>
+                    <div style={{ display: "grid", gap: 2 }}>
+                      {s.recent.map((a) => {
+                        const run = a.sport === "Run" || a.sport === "TrailRun";
+                        return (
+                          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 6px", borderBottom: `1px solid ${T.line}` }}>
+                            <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{sportGlyph(a.sport)}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}{a.isRace && <span style={{ fontFamily: T.mono, fontSize: 9.5, color: FIT, border: `1px solid ${FIT}60`, borderRadius: 999, padding: "1px 6px", marginLeft: 8, letterSpacing: "0.05em" }}>RACE</span>}</div>
+                              <div style={{ fontFamily: T.mono, fontSize: 11, color: T.inkSoft, marginTop: 2 }}>{shortDate(a.date)}{a.distance ? ` · ${fmtKm(a.distance)} km` : ""}{run && a.avgSpeed ? ` · ${fmtPace(a.avgSpeed)}` : ""} · {fmtDur(a.movingTime)}</div>
+                            </div>
+                            {(a.prs > 0 || a.achievements > 0) && (
+                              <span style={{ fontFamily: T.mono, fontSize: 10.5, color: FIT, flexShrink: 0 }}>{a.prs > 0 ? `${a.prs} PR` : `${a.achievements} ✦`}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontFamily: T.mono, fontSize: 10, color: T.inkSoft, marginTop: 12, letterSpacing: "0.04em" }}>Powered by Strava{data.strava?.fetchedAt ? ` · synced ${new Date(data.strava.fetchedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ================= FUN & TRAVEL ================= */}
+        {tab === "travel" && (
+          <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Eyebrow>Fun &amp; Travel · mood boards</Eyebrow>
+              <span style={{ marginLeft: "auto", fontFamily: T.mono, fontSize: 11, color: travelState === "error" ? "#E86E5A" : T.inkSoft }}>
+                {travelState === "saving" && "saving…"}{travelState === "error" && "save failed"}
+              </span>
+            </div>
+
+            {travelState === "unconfigured" ? (
+              <div style={card}>
+                <div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Set up shareable boards</div>
+                <div style={{ fontSize: 13.5, color: T.inkSoft, lineHeight: 1.7 }}>
+                  Trip boards and photos need storage. In Vercel → <b>Storage</b>, add a <b>KV</b> store (boards + share links) and a <b>Blob</b> store (photos), connect both to this project, then redeploy. The env vars (<code style={{ fontFamily: T.mono, fontSize: 12 }}>KV_REST_API_URL</code>, <code style={{ fontFamily: T.mono, fontSize: 12 }}>KV_REST_API_TOKEN</code>, <code style={{ fontFamily: T.mono, fontSize: 12 }}>BLOB_READ_WRITE_TOKEN</code>) are added automatically. See the README's “Travel mood board setup.”
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ ...card, display: "flex", gap: 8 }}>
+                  <input value={newTrip} onChange={(e) => setNewTrip(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createTrip()} placeholder="Name a trip — “Lisbon spring”, “Big Sur road trip”…" style={{ ...inputStyle, flex: 1 }} />
+                  <button onClick={createTrip} style={{ border: "none", background: T.accent, color: "#FFF", borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}><Plus size={15} /> New</button>
+                </div>
+
+                {boards && boards.length === 0 && travelState !== "loading" && (
+                  <div style={{ fontSize: 13, color: T.inkSoft, padding: "4px 2px" }}>No boards yet. Start one above — add photos, a vibe, a packing list, then publish a shareable link.</div>
+                )}
+                {travelState === "loading" && !boards?.length && <div style={{ ...card, fontFamily: T.mono, fontSize: 12.5, color: T.inkSoft, animation: "pulse 1.2s infinite" }}>loading boards…</div>}
+
+                {(boards || []).map((b) => {
+                  const open = openBoard === b.id;
+                  return (
+                    <div key={b.id} style={{ ...card, padding: 0, overflow: "hidden" }}>
+                      <button onClick={() => setOpenBoard(open ? null : b.id)} style={{ width: "100%", textAlign: "left", border: "none", background: "transparent", cursor: "pointer", padding: 18, display: "flex", alignItems: "center", gap: 12 }}>
+                        {b.photos?.[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={b.photos[0].url} alt="" style={{ width: 46, height: 46, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                          <span style={{ width: 46, height: 46, borderRadius: 10, background: T.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: T.accent }}><MapPin size={20} /></span>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: T.display, fontWeight: 600, fontSize: 16 }}>{b.title}</div>
+                          <div style={{ fontSize: 12.5, color: T.inkSoft, marginTop: 2 }}>{[b.destination, b.startDate && shortDate(b.startDate), `${b.photos?.length || 0} photo${(b.photos?.length || 0) === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}</div>
+                        </div>
+                        {b.shareToken && <Share2 size={15} color={T.accent} />}
+                        {open ? <ChevronRight size={18} style={{ transform: "rotate(90deg)" }} color={T.inkSoft} /> : <ChevronRight size={18} color={T.inkSoft} />}
+                      </button>
+
+                      {open && (
+                        <div style={{ borderTop: `1px solid ${T.line}`, padding: 18, display: "grid", gap: 14 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+                            <input value={b.destination} onChange={(e) => patchLocal(b.id, (x) => ({ ...x, destination: e.target.value }))} onBlur={() => saveBoards(boards)} placeholder="Destination" style={{ ...inputStyle, fontSize: 13 }} />
+                            <input value={b.vibe} onChange={(e) => patchLocal(b.id, (x) => ({ ...x, vibe: e.target.value }))} onBlur={() => saveBoards(boards)} placeholder="Vibe — coastal, cozy, art…" style={{ ...inputStyle, fontSize: 13 }} />
+                            <input type="date" value={b.startDate} onChange={(e) => mutateBoard(b.id, (x) => ({ ...x, startDate: e.target.value }))} style={{ ...inputStyle, fontSize: 13 }} />
+                            <input type="date" value={b.endDate} onChange={(e) => mutateBoard(b.id, (x) => ({ ...x, endDate: e.target.value }))} style={{ ...inputStyle, fontSize: 13 }} />
+                          </div>
+                          <textarea value={b.notes} onChange={(e) => patchLocal(b.id, (x) => ({ ...x, notes: e.target.value }))} onBlur={() => saveBoards(boards)} placeholder="Notes, plans, links, dreams…" rows={3} style={{ ...inputStyle, resize: "vertical", fontFamily: T.body }} />
+
+                          {/* Photo grid */}
+                          <div>
+                            <div style={{ columnWidth: 150, columnGap: 8 }}>
+                              {(b.photos || []).map((p, i) => (
+                                <div key={i} style={{ breakInside: "avoid", marginBottom: 8, position: "relative" }}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={p.url} alt={p.caption || ""} style={{ width: "100%", borderRadius: 10, display: "block" }} />
+                                  <button onClick={() => mutateBoard(b.id, (x) => ({ ...x, photos: x.photos.filter((_, j) => j !== i) }))} aria-label="Remove photo" style={{ position: "absolute", top: 6, right: 6, border: "none", background: "rgba(0,0,0,0.55)", color: "#FFF", borderRadius: 999, width: 24, height: 24, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={13} /></button>
+                                  <input value={p.caption} onChange={(e) => patchLocal(b.id, (x) => ({ ...x, photos: x.photos.map((ph, j) => (j === i ? { ...ph, caption: e.target.value } : ph)) }))} onBlur={() => saveBoards(boards)} placeholder="caption" style={{ ...inputStyle, fontSize: 11, padding: "4px 8px", width: "100%", marginTop: 4 }} />
+                                </div>
+                              ))}
+                            </div>
+                            <label style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 8, border: `1px dashed ${T.line}`, borderRadius: 10, padding: "8px 14px", cursor: uploadingBoard === b.id ? "default" : "pointer", color: T.inkSoft, fontSize: 12.5 }}>
+                              {uploadingBoard === b.id ? <RefreshCw size={14} className="spin" /> : <Upload size={14} />} {uploadingBoard === b.id ? "uploading…" : "Add photo"}
+                              <input type="file" accept="image/*" disabled={uploadingBoard === b.id} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadPhoto(b.id, f); }} style={{ display: "none" }} />
+                            </label>
+                          </div>
+
+                          {/* Checklist */}
+                          <div>
+                            <div style={{ fontFamily: T.mono, fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: T.inkSoft, marginBottom: 8 }}>Plan / packing</div>
+                            <div style={{ display: "grid", gap: 4 }}>
+                              {(b.checklist || []).map((c) => (
+                                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <button onClick={() => mutateBoard(b.id, (x) => ({ ...x, checklist: x.checklist.map((it) => (it.id === c.id ? { ...it, done: !it.done } : it)) }))} aria-label="toggle" style={{ width: 18, height: 18, borderRadius: 6, flexShrink: 0, border: `2px solid ${c.done ? T.accent : "#C7C7CC"}`, background: c.done ? T.accent : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>{c.done && <Check size={11} color="#FFF" strokeWidth={3.5} />}</button>
+                                  <span style={{ flex: 1, fontSize: 13.5, color: c.done ? T.inkSoft : T.ink, textDecoration: c.done ? "line-through" : "none" }}>{c.text}</span>
+                                  <button onClick={() => mutateBoard(b.id, (x) => ({ ...x, checklist: x.checklist.filter((it) => it.id !== c.id) }))} aria-label="remove" style={{ border: "none", background: "none", cursor: "pointer", color: "#C7C7CC", padding: 2 }}><X size={13} /></button>
+                                </div>
+                              ))}
+                            </div>
+                            <input placeholder="Add an item + Enter" onKeyDown={(e) => { if (e.key === "Enter" && e.currentTarget.value.trim()) { const text = e.currentTarget.value.trim(); e.currentTarget.value = ""; mutateBoard(b.id, (x) => ({ ...x, checklist: [...(x.checklist || []), { id: uid("ck"), text, done: false }] })); } }} style={{ ...inputStyle, fontSize: 13, marginTop: 8, width: "100%" }} />
+                          </div>
+
+                          {/* Share + delete */}
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", borderTop: `1px solid ${T.line}`, paddingTop: 14 }}>
+                            {b.shareToken ? (
+                              <>
+                                <button onClick={() => copyShare(b.shareToken)} style={{ display: "flex", alignItems: "center", gap: 7, border: "none", background: T.accent, color: "#FFF", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Copy size={14} /> {copiedToken === b.shareToken ? "Copied!" : "Copy link"}</button>
+                                <a href={shareUrl(b.shareToken)} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: T.accent, fontFamily: T.mono }}>open ↗</a>
+                                <button onClick={() => toggleShare(b.id, "unpublish")} disabled={shareBusy === b.id} style={{ border: `1px solid ${T.line}`, background: "transparent", color: T.inkSoft, borderRadius: 8, padding: "8px 12px", fontSize: 12, cursor: "pointer" }}>{shareBusy === b.id ? "…" : "Unpublish"}</button>
+                              </>
+                            ) : (
+                              <button onClick={() => toggleShare(b.id, "publish")} disabled={shareBusy === b.id} style={{ display: "flex", alignItems: "center", gap: 7, border: `1px solid ${T.accent}`, background: "transparent", color: T.accent, borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Share2 size={14} /> {shareBusy === b.id ? "publishing…" : "Publish shareable link"}</button>
+                            )}
+                            <button onClick={() => deleteTrip(b.id)} style={{ marginLeft: "auto", border: "none", background: "none", color: "#C7C7CC", cursor: "pointer", fontSize: 12, fontFamily: T.mono }}>delete trip</button>
+                          </div>
+                          {b.shareToken && <div style={{ fontFamily: T.mono, fontSize: 10.5, color: T.inkSoft, marginTop: -4 }}>⚠ Anyone with this link can view this board (no password). Unpublish to kill it.</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
