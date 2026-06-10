@@ -64,19 +64,18 @@ npx vercel env add STRAVA_REFRESH_TOKEN production
 ```
 
 ### 3. Attach the custom domain
-Mia wants the dashboard on the **apex** `miachaszeyka.com`.
+**Chosen: the `dashboard.miachaszeyka.com` subdomain** — keeps the existing site at the
+apex `miachaszeyka.com` untouched.
 ```bash
-npx vercel domains add miachaszeyka.com
+npx vercel domains add dashboard.miachaszeyka.com
 ```
-Then add the DNS records Vercel prints at the registrar/DNS host. For an apex domain
-that's usually an **A record to `76.76.21.21`** (Vercel may also offer nameserver
-delegation); a `www` CNAME to `cname.vercel-dns.com` is typical too. Wait for
-verification, then confirm https://miachaszeyka.com loads the login page.
+Then add the DNS record Vercel prints (a **CNAME** for `dashboard` →
+`cname.vercel-dns.com`) at the DNS host for miachaszeyka.com. Wait for verification,
+then confirm https://dashboard.miachaszeyka.com loads the login page.
 
-⚠️ **Apex trade-off:** `miachaszeyka.com` may currently serve another site. Pointing the
-apex here **replaces** whatever lives at the root. If the existing site should stay,
-use a subdomain (`dashboard.miachaszeyka.com`) instead — same steps, different host.
-Confirm with Mia before repointing the apex.
+> If you ever want the dashboard on the apex `miachaszeyka.com` instead, that would
+> **replace** whatever currently serves the root — use an A record to `76.76.21.21`
+> (or nameserver delegation). Decided against for now to preserve the existing site.
 
 ### 4. Post-deploy verification checklist
 - [ ] Visiting the root URL while logged out → redirected to /login
